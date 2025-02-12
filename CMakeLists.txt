@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 if(WIN32)
     set(FALCON_BACKEND src/falcon_windows.cpp)
+    set(WINDOWS_LIBS ws2_32)
 else ()
     set(FALCON_BACKEND src/falcon_posix.cpp)
 endif (WIN32)
@@ -16,3 +17,7 @@ target_link_libraries(falcon PUBLIC spdlog::spdlog_header_only fmt::fmt-header-o
 add_subdirectory(externals)
 add_subdirectory(samples)
 add_subdirectory(tests)
+
+target_link_libraries(falcon PRIVATE ${WINDOWS_LIBS})
+target_link_libraries(client PRIVATE ${WINDOWS_LIBS})
+target_link_libraries(server PRIVATE ${WINDOWS_LIBS})

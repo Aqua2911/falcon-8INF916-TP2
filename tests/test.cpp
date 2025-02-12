@@ -1,12 +1,14 @@
 #include <string>
 #include <array>
 #include <span>
+#include <winsock2.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include "falcon.h"
+#include "spdlog/spdlog.h"
 
-TEST_CASE( "Can Listen", "[falcon]" ) {
+TEST_CASE("Can Listen", "[falcon]") {
     auto receiver = Falcon::Listen("127.0.0.1", 5555);
     REQUIRE(receiver != nullptr);
 }
@@ -31,6 +33,7 @@ TEST_CASE("Can Receive From", "[falcon]") {
     std::string message = "Hello World!";
     std::span data(message.data(), message.size());
     int bytes_sent = sender->SendTo("127.0.0.1", 5555, data);
+
     REQUIRE(bytes_sent == message.size());
     std::string from_ip;
     from_ip.resize(255);

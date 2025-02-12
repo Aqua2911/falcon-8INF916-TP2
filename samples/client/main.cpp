@@ -9,7 +9,7 @@ int main() {
     spdlog::debug("Hello World!");
 
     auto falcon = Falcon::Connect("127.0.0.1", 5556);
-    std::string message = "Hello World!";
+    std::string message = "Client to Server Hello World!";
     std::span data(message.data(), message.size());
     falcon->SendTo("127.0.0.1", 5555, data);
 
