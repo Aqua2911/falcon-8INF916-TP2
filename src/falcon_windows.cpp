@@ -121,6 +121,9 @@ std::unique_ptr<Falcon> Falcon::Connect(const std::string& serverIp, uint16_t po
     return falcon;
 }
 
+void Falcon::OnClientConnected(std::function<void, uint64_t> handler) {
+}
+
 int Falcon::SendToInternal(const std::string &to, uint16_t port, std::span<const char> message)
 {
     const sockaddr destination = StringToIp(to, port);
