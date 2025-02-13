@@ -2,6 +2,7 @@
 #include <array>
 #include <iostream>
 #include <span>
+#include <unistd.h>
 #include <winsock2.h>
 
 #include <catch2/catch_test_macros.hpp>
@@ -62,4 +63,29 @@ TEST_CASE("Can Connect To", "[falcon]") {
     int byte_received_client = sender->ReceiveFrom(from_ip, buffer);
 
     std::cout << "Here" << std::endl;
+}
+
+TEST_CASE("Can Notify Disconnection", "[falcon]") {
+    auto sender = Falcon::Connect("127.0.0.1", 5556);
+    auto receiver = Falcon::Listen("127.0.0.1", 5555);
+    sender->ConnectTo("127.0.0.1", 5555);
+
+    std::string from_ip;
+    from_ip.resize(255);
+    std::array<char, 65535> buffer;
+    int byte_received_server = receiver->ReceiveFrom(from_ip, buffer);
+
+    int byte_received_client = sender->ReceiveFrom(from_ip, buffer);
+
+    sender->SendTo("127.0.0.1", 5555, "Hello World!");
+
+    // Wait for 2 seconds
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    auto duration = now - receiver->clients.at(0)->lastHeartbeat;
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+    if (seconds > 1) {
+        std::cout << "Here" << std::endl;
+    }
 }

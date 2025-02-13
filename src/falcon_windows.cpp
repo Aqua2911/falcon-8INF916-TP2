@@ -103,6 +103,7 @@ std::unique_ptr<Falcon> Falcon::Listen(const std::string& endpoint, uint16_t por
         return nullptr;
     }
 
+    falcon->ClientID = 0;
     return falcon;
 }
 
@@ -146,6 +147,7 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
     auto* newClient = new ClientInfo;
     newClient->clientID = newClientID;
     newClient->port = clientPort;
+    newClient->lastHeartbeat = std::chrono::steady_clock::now();
     clients.push_back(newClient);
 
     std::string message = "ACKNOWLEDGE|";
@@ -180,30 +182,81 @@ int Falcon::ReceiveFromInternal(std::string &from, std::span<char, 65535> messag
 
     from = IpToString(reinterpret_cast<const sockaddr*>(&peer_addr));
 
-    //Server test if it's a new client trying to connect
-    if (GetMessageType(message) == MessageType::CONNECT)
+    //Server Only
+    if(ClientID == 0)
     {
         size_t pos = from.find(':'); // Find the position of the character
-        if (pos != std::string::npos) {
-            const std::string fromIP = from.substr(0, pos); // substring up to the delimiter
-            const std::string fromPort = from.substr(pos + 1);
+        const std::string fromIP = from.substr(0, pos); // substring up to the delimiter
+        const std::string fromPort = from.substr(pos + 1);
 
-            //Get The Informations of the new Client
-            OnClientConnected(fromIP, stoi(fromPort));
+        //Test if it's a new client trying to connect
+        if (GetMessageType(message) == MessageType::CONNECT)
+        {
+                //Get The Informations of the new Client
+                OnClientConnected(fromIP, stoi(fromPort));
+        }
+        else
+        {
+            UpdateLastHeartbeat(GetSenderID(from));
         }
     }
-
-    if (GetMessageType(message) == MessageType::ACKNOWLEDGE)
+    else
+    //Client Only
+    if(ClientID != 0)
     {
-        std::string str(message.data(), message.size());
-        size_t pos = str.find('|'); // Find the position of the character
-        if (pos != std::string::npos) {
-            const std::string ClientID = str.substr(pos + 1);
-            OnConnectionEvent(stoi(ClientID));
+        if (GetMessageType(message) == MessageType::ACKNOWLEDGE)
+        {
+            std::string str(message.data(), message.size());
+            size_t pos = str.find('|'); // Find the position of the character
+            if (pos != std::string::npos) {
+                const std::string ClientID = str.substr(pos + 1);
+                OnConnectionEvent(stoi(ClientID));
+            }
+        }
+
+        if (GetMessageType(message) == MessageType::HEARTBEAT)
+        {
+            std::string heartBeatMessage = "ACKNOWLEDGE|";
+            heartBeatMessage.append(std::to_string(ClientID));
+            SendTo(from, stoi(from), heartBeatMessage);
         }
     }
+
 
     return read_bytes;
+}
+
+void Falcon::UpdateLastHeartbeat(const uint64_t ClientID)
+{
+    for(auto c : clients) {
+        if (c->clientID == ClientID)
+        {
+            c->lastHeartbeat = std::chrono::steady_clock::now();
+            return;
+        }
+    }
+}
+
+void Falcon::HeartBeat()
+{
+    for (auto c: clients)
+    {
+        SendTo("127.0.0.1", c->port, "HEARTBEAT|");
+    }
+}
+
+uint64_t Falcon::GetSenderID(std::string &from)
+{
+    size_t pos = from.find(':'); // Find the position of the character
+    const std::string fromPort = from.substr(pos + 1);
+
+    for (auto c: clients) {
+        if (c->port == stoi(fromPort))
+        {
+            return c->clientID;
+        }
+    }
+    return 0;
 }
 
 MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
@@ -222,6 +275,10 @@ MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
     else if (str == "ACKNOWLEDGE")
     {
         return MessageType::ACKNOWLEDGE;
+    }
+    else if (str == "HEARTBEAT")
+    {
+        return MessageType::HEARTBEAT;
     }
     else {
         return MessageType::MESSAGE;

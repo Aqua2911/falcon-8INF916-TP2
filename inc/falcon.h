@@ -23,6 +23,7 @@ enum MessageType
     CONNECT,
     ACKNOWLEDGE,
     MESSAGE,
+    HEARTBEAT,
 };
 
 class Falcon {
@@ -34,9 +35,9 @@ public:
     //Client
     static std::unique_ptr<Falcon> Connect(const std::string& serverIp, uint16_t port);
     void ConnectTo(const std::string& ip, uint16_t port);
-
-
     void OnConnectionEvent(uint64_t newClientID); //Here the bool represent the success of the connection
+
+
 
     void OnClientDisconnected(std::function<void(uint64_t)> handler); //Server API
     void OnDisconnect(std::function<void> handler);  //Client API
@@ -57,15 +58,17 @@ public:
     int ReceiveFrom(std::string& from, std::span<char, 65535> message);
 
     static MessageType GetMessageType(const std::span<char, 65535> message);
-
+    std::pmr::vector<ClientInfo*> clients;
 private:
     int SendToInternal(const std::string& to, uint16_t port, std::span<const char> message);
     int ReceiveFromInternal(std::string& from, std::span<char, 65535> message);
 
+    void UpdateLastHeartbeat(const uint64_t ClientID);
+    void HeartBeat();
+    uint64_t GetSenderID(std::string &from);
 
 
 
-    std::pmr::vector<ClientInfo*> clients;
-    uint64_t ClientID = 0;
+    uint64_t ClientID;
     SocketType m_socket;
 };
