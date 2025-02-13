@@ -77,6 +77,7 @@ sockaddr StringToIp(const std::string& ip, uint16_t port)
     return result;
 }
 
+
 Falcon::Falcon()
 {
     static WinSockInitializer winsockInitializer{};
@@ -121,7 +122,31 @@ std::unique_ptr<Falcon> Falcon::Connect(const std::string& serverIp, uint16_t po
     return falcon;
 }
 
-void Falcon::OnClientConnected(std::function<void, uint64_t> handler) {
+void Falcon::ConnectTo(const std::string &ip, uint16_t port)
+{
+    SendToInternal(ip, port, "CONNECT|");
+}
+
+void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
+{
+    uint64_t newClientID;
+    if (!clients.empty())
+    {
+        newClientID = ++clients.back()->clientID;
+    }
+    else
+    {
+        newClientID = 1;
+    }
+    auto* newClient = new ClientInfo;
+    newClient->clientID = newClientID;
+    newClient->port = clientPort;
+    clients.push_back(newClient);
+
+    std::string message = "ACKNOWLEDGE|";
+    message.append(std::to_string(newClientID));
+
+    SendToInternal(from, clientPort, message);
 }
 
 int Falcon::SendToInternal(const std::string &to, uint16_t port, std::span<const char> message)
@@ -150,4 +175,26 @@ int Falcon::ReceiveFromInternal(std::string &from, std::span<char, 65535> messag
     from = IpToString(reinterpret_cast<const sockaddr*>(&peer_addr));
 
     return read_bytes;
+}
+
+MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
+    // Convert to string
+    std::string str(message.data(), message.size());
+
+    size_t pos = str.find('|'); // Find the position of the character
+    if (pos != std::string::npos) {
+        str = str.substr(0, pos); // substring up to the delimiter
+    }
+
+    if (str == "CONNECT")
+    {
+        return MessageType::CONNECT;
+    }
+    else if (str == "ACKNOWLEDGE")
+    {
+        return MessageType::ACKNOWLEDGE;
+    }
+    else {
+        return MessageType::MESSAGE;
+    }
 }
