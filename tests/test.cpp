@@ -1,5 +1,6 @@
 #include <string>
 #include <array>
+#include <iostream>
 #include <span>
 #include <winsock2.h>
 
@@ -56,18 +57,9 @@ TEST_CASE("Can Connect To", "[falcon]") {
     std::string from_ip;
     from_ip.resize(255);
     std::array<char, 65535> buffer;
-    int byte_received = receiver->ReceiveFrom(from_ip, buffer);
+    int byte_received_server = receiver->ReceiveFrom(from_ip, buffer);
 
-    if (Falcon::GetMessageType(buffer) == MessageType::CONNECT)
-    {
-        receiver->OnClientConnected(from_ip, 5556);
-        sender->ReceiveFrom(from_ip, buffer);
+    int byte_received_client = sender->ReceiveFrom(from_ip, buffer);
 
-        if (Falcon::GetMessageType(buffer) == MessageType::ACKNOWLEDGE)
-        {
-            //sender->OnConnectionEvent();
-        }
-    }
-
-    if (std::to_string(byte_received) == "127.0.0.1:5556") {}
+    std::cout << "Here" << std::endl;
 }

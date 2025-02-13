@@ -36,7 +36,7 @@ public:
     void ConnectTo(const std::string& ip, uint16_t port);
 
 
-    void OnConnectionEvent(std::function<void(bool, uint64_t)> handler); //Here the bool represent the success of the connection
+    void OnConnectionEvent(uint64_t newClientID); //Here the bool represent the success of the connection
 
     void OnClientDisconnected(std::function<void(uint64_t)> handler); //Server API
     void OnDisconnect(std::function<void> handler);  //Client API
@@ -66,5 +66,6 @@ private:
 
 
     std::pmr::vector<ClientInfo*> clients;
+    uint64_t ClientID = 0;
     SocketType m_socket;
 };

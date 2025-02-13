@@ -127,6 +127,11 @@ void Falcon::ConnectTo(const std::string &ip, uint16_t port)
     SendToInternal(ip, port, "CONNECT|");
 }
 
+void Falcon::OnConnectionEvent(uint64_t newClientID)
+{
+    ClientID = newClientID;
+}
+
 void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
 {
     uint64_t newClientID;
@@ -146,6 +151,7 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
     std::string message = "ACKNOWLEDGE|";
     message.append(std::to_string(newClientID));
 
+    //Send an Acknowledgement to the Client
     SendToInternal(from, clientPort, message);
 }
 
@@ -173,6 +179,29 @@ int Falcon::ReceiveFromInternal(std::string &from, std::span<char, 65535> messag
         &peer_addr_len);
 
     from = IpToString(reinterpret_cast<const sockaddr*>(&peer_addr));
+
+    //Server test if it's a new client trying to connect
+    if (GetMessageType(message) == MessageType::CONNECT)
+    {
+        size_t pos = from.find(':'); // Find the position of the character
+        if (pos != std::string::npos) {
+            const std::string fromIP = from.substr(0, pos); // substring up to the delimiter
+            const std::string fromPort = from.substr(pos + 1);
+
+            //Get The Informations of the new Client
+            OnClientConnected(fromIP, stoi(fromPort));
+        }
+    }
+
+    if (GetMessageType(message) == MessageType::ACKNOWLEDGE)
+    {
+        std::string str(message.data(), message.size());
+        size_t pos = str.find('|'); // Find the position of the character
+        if (pos != std::string::npos) {
+            const std::string ClientID = str.substr(pos + 1);
+            OnConnectionEvent(stoi(ClientID));
+        }
+    }
 
     return read_bytes;
 }
