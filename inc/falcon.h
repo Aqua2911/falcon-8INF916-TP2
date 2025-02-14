@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <span>
+#include <thread>
 #include <_bsd_types.h>
 
 #include "ClientInfo.h"
@@ -37,9 +38,10 @@ public:
     void ConnectTo(const std::string& ip, uint16_t port);
     void OnConnectionEvent(uint64_t newClientID); //Here the bool represent the success of the connection
 
+    //void StartHeartbeat();
+    void StartCleanUp();
 
-
-    void OnClientDisconnected(std::function<void(uint64_t)> handler); //Server API
+    void OnClientDisconnected(ClientInfo* c); //Server API
     void OnDisconnect(std::function<void> handler);  //Client API
 
 
@@ -64,11 +66,28 @@ private:
     int ReceiveFromInternal(std::string& from, std::span<char, 65535> message);
 
     void UpdateLastHeartbeat(const uint64_t ClientID);
-    void HeartBeat();
+    void CleanConnections();
+
+
+    //void HeartbeatLoop();
+    //void HeartBeat();
+    void CleanUpLoop();
+    long long ElapsedTime(ClientInfo* c);
     uint64_t GetSenderID(std::string &from);
 
 
-
+    //std::thread heartbeatThread;
+    std::thread CleanConnectionsThread;
     uint64_t ClientID;
     SocketType m_socket;
 };
+
+/*
+inline void Falcon::HeartbeatLoop()
+{
+    while (true) {
+        HeartBeat();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+}
+*/

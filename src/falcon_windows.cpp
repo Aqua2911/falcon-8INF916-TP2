@@ -12,6 +12,8 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
+#include <iostream>
+
 #include "falcon.h"
 
 struct WinSockInitializer
@@ -104,6 +106,7 @@ std::unique_ptr<Falcon> Falcon::Listen(const std::string& endpoint, uint16_t por
     }
 
     falcon->ClientID = 0;
+    falcon->StartCleanUp();
     return falcon;
 }
 
@@ -131,6 +134,17 @@ void Falcon::ConnectTo(const std::string &ip, uint16_t port)
 void Falcon::OnConnectionEvent(uint64_t newClientID)
 {
     ClientID = newClientID;
+}
+
+void Falcon::StartCleanUp()
+{
+    if (ClientID ==0) {
+        CleanConnectionsThread = std::thread(&Falcon::CleanUpLoop, this);
+    }
+}
+
+void Falcon::OnClientDisconnected(ClientInfo *c) {
+    clients.erase(std::ranges::remove(clients, c).begin(), clients.end());
 }
 
 void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
@@ -195,10 +209,7 @@ int Falcon::ReceiveFromInternal(std::string &from, std::span<char, 65535> messag
                 //Get The Informations of the new Client
                 OnClientConnected(fromIP, stoi(fromPort));
         }
-        else
-        {
-            UpdateLastHeartbeat(GetSenderID(from));
-        }
+        UpdateLastHeartbeat(GetSenderID(from));
     }
     else
     //Client Only
@@ -213,16 +224,7 @@ int Falcon::ReceiveFromInternal(std::string &from, std::span<char, 65535> messag
                 OnConnectionEvent(stoi(ClientID));
             }
         }
-
-        if (GetMessageType(message) == MessageType::HEARTBEAT)
-        {
-            std::string heartBeatMessage = "ACKNOWLEDGE|";
-            heartBeatMessage.append(std::to_string(ClientID));
-            SendTo(from, stoi(from), heartBeatMessage);
-        }
     }
-
-
     return read_bytes;
 }
 
@@ -237,12 +239,29 @@ void Falcon::UpdateLastHeartbeat(const uint64_t ClientID)
     }
 }
 
-void Falcon::HeartBeat()
+void Falcon::CleanConnections()
 {
     for (auto c: clients)
     {
-        SendTo("127.0.0.1", c->port, "HEARTBEAT|");
+        if (ElapsedTime(c) > 5)
+            OnClientDisconnected(c);
     }
+}
+
+void Falcon::CleanUpLoop()
+{
+    while (true) {
+        CleanConnections();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+}
+
+
+long long Falcon::ElapsedTime(ClientInfo* c) {
+    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    auto duration = now - c->lastHeartbeat;
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+    return seconds;
 }
 
 uint64_t Falcon::GetSenderID(std::string &from)

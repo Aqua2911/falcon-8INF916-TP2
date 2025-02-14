@@ -77,15 +77,15 @@ TEST_CASE("Can Notify Disconnection", "[falcon]") {
 
     int byte_received_client = sender->ReceiveFrom(from_ip, buffer);
 
-    sender->SendTo("127.0.0.1", 5555, "Hello World!");
+    for (int i =0; i < 10; i++)
+    {
+        sender->SendTo("127.0.0.1", 5555, "Hello World!");
+        receiver->ReceiveFrom(from_ip, buffer);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
 
-    // Wait for 2 seconds
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-    auto duration = now - receiver->clients.at(0)->lastHeartbeat;
-    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
-    if (seconds > 1) {
-        std::cout << "Here" << std::endl;
+    while (!receiver->clients.empty())
+    {
+        std::cout << "Not Empty" << std::endl;
     }
 }
