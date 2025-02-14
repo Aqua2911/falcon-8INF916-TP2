@@ -90,6 +90,7 @@ Falcon::~Falcon() {
     {
         closesocket(m_socket);
     }
+    StopCleanUp();
 }
 
 std::unique_ptr<Falcon> Falcon::Listen(const std::string& endpoint, uint16_t port)
@@ -106,7 +107,6 @@ std::unique_ptr<Falcon> Falcon::Listen(const std::string& endpoint, uint16_t por
     }
 
     falcon->ClientID = 0;
-    falcon->StartCleanUp();
     return falcon;
 }
 
@@ -144,7 +144,10 @@ void Falcon::StartCleanUp()
 }
 
 void Falcon::OnClientDisconnected(ClientInfo *c) {
-    clients.erase(std::ranges::remove(clients, c).begin(), clients.end());
+    auto it = std::find(clients.begin(), clients.end(), c);
+    if (it != clients.end()) {
+        clients.erase(it);
+    }
 }
 
 void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
@@ -169,6 +172,7 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
 
     //Send an Acknowledgement to the Client
     SendToInternal(from, clientPort, message);
+    StartCleanUp();
 }
 
 int Falcon::SendToInternal(const std::string &to, uint16_t port, std::span<const char> message)
@@ -250,9 +254,17 @@ void Falcon::CleanConnections()
 
 void Falcon::CleanUpLoop()
 {
-    while (true) {
+    while (running) {
         CleanConnections();
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+}
+
+void Falcon::StopCleanUp()
+{
+    running = false;
+    if (CleanConnectionsThread.joinable()) {
+        CleanConnectionsThread.join();
     }
 }
 

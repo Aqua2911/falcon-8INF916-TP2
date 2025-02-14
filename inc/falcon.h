@@ -40,6 +40,7 @@ public:
 
     //void StartHeartbeat();
     void StartCleanUp();
+    void StopCleanUp();
 
     void OnClientDisconnected(ClientInfo* c); //Server API
     void OnDisconnect(std::function<void> handler);  //Client API
@@ -72,12 +73,14 @@ private:
     //void HeartbeatLoop();
     //void HeartBeat();
     void CleanUpLoop();
+
     long long ElapsedTime(ClientInfo* c);
     uint64_t GetSenderID(std::string &from);
 
 
     //std::thread heartbeatThread;
     std::thread CleanConnectionsThread;
+    std::atomic<bool> running{true};
     uint64_t ClientID;
     SocketType m_socket;
 };

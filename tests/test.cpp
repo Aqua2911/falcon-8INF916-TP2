@@ -88,4 +88,7 @@ TEST_CASE("Can Notify Disconnection", "[falcon]") {
     {
         std::cout << "Not Empty" << std::endl;
     }
+    receiver->StopCleanUp();
+
+    std::cout << "Empty" << std::endl;
 }
