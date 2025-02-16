@@ -73,22 +73,9 @@ TEST_CASE("Can Notify Disconnection", "[falcon]") {
     std::string from_ip;
     from_ip.resize(255);
     std::array<char, 65535> buffer;
-    int byte_received_server = receiver->ReceiveFrom(from_ip, buffer);
+    receiver->ReceiveFrom(from_ip, buffer);
 
-    int byte_received_client = sender->ReceiveFrom(from_ip, buffer);
-
-    for (int i =0; i < 10; i++)
-    {
-        sender->SendTo("127.0.0.1", 5555, "Hello World!");
-        receiver->ReceiveFrom(from_ip, buffer);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-
-    while (!receiver->clients.empty())
-    {
-        std::cout << "Not Empty" << std::endl;
-    }
-    receiver->StopCleanUp();
-
-    std::cout << "Empty" << std::endl;
+    REQUIRE(!receiver->clients.empty());
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    REQUIRE(receiver->clients.empty());
 }
