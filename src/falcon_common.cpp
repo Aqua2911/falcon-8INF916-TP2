@@ -197,10 +197,10 @@ MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
 
 std::unique_ptr<Stream> Falcon::CreateStream(uint64_t client, bool reliable) {  // Server API
     // generate unique stream and id
-    auto stream = std::make_unique<Stream>(nextStreamID++, reliable);
+    auto stream = std::make_unique<Stream>(client, nextStreamID++, reliable);
 
-    activeStreams[client][stream->GetID()] = std::move(stream);
-    return std::move(activeStreams[client][stream->GetID()]);
+    activeStreams[stream->GetID()] = std::move(stream);
+    return std::move(activeStreams[stream->GetID()]);
 }
 
 std::unique_ptr<Stream> Falcon::CreateStream(bool reliable) {   // Client API

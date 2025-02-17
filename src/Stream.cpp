@@ -3,7 +3,7 @@
 //
 #include "Stream.h"
 
-Stream::Stream(uint32_t id, bool reliable) : streamID(id), isReliable(reliable) {}
+Stream::Stream(uint64_t client, uint32_t id, bool reliable) : clientID(client), streamID(id), isReliable(reliable) {}
 
 void Stream::SendData(std::span<const char> Data)
 {

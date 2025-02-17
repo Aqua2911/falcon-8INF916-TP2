@@ -8,7 +8,7 @@
 
 class Stream {
 public:
-    Stream(uint32_t id, bool reliable);
+    Stream(uint64_t clientID, uint32_t id, bool reliable);
 
     void SendData(std::span<const char> Data);
     void OnDataReceived(std::span<const char> Data);
@@ -17,9 +17,10 @@ public:
     bool IsReliable() const;
 
 private:
-    auto server;
-    auto client;
+    //auto server;
+    //auto client;
 
+    uint64_t clientID;
     uint32_t streamID;
     bool isReliable;
     std::vector<std::span<const char>> pendingResends;
