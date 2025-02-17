@@ -86,7 +86,7 @@ private:
     SocketType m_socket;
 
     // streams
-    std::unordered_map<uint32_t, std::unique_ptr<Stream>> activeStreams;
+    std::unordered_map<uint64_t, std::unordered_map<uint32_t, std::unique_ptr<Stream>>> activeStreams;
     uint32_t nextStreamID = 1;
 };
 

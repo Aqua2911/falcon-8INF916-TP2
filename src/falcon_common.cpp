@@ -199,8 +199,8 @@ std::unique_ptr<Stream> Falcon::CreateStream(uint64_t client, bool reliable) {  
     // generate unique stream and id
     auto stream = std::make_unique<Stream>(nextStreamID++, reliable);
 
-    activeStreams[stream->GetID()] = std::move(stream);
-    return std::move(activeStreams[stream->GetID()]);
+    activeStreams[client][stream->GetID()] = std::move(stream);
+    return std::move(activeStreams[client][stream->GetID()]);
 }
 
 std::unique_ptr<Stream> Falcon::CreateStream(bool reliable) {   // Client API
