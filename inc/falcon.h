@@ -84,6 +84,10 @@ private:
     std::atomic<bool> running{true};
     uint64_t ClientID;
     SocketType m_socket;
+
+    // streams
+    std::unordered_map<uint32_t, std::unique_ptr<Stream>> activeStreams;
+    uint32_t nextStreamID = 1;
 };
 
 /*
