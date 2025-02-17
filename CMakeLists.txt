@@ -10,7 +10,7 @@ else ()
     set(FALCON_BACKEND src/falcon_posix.cpp)
 endif (WIN32)
 
-add_library(falcon STATIC inc/falcon.h src/falcon_common.cpp ${FALCON_BACKEND})
+add_library(falcon STATIC inc/falcon.h src/falcon_common.cpp ${FALCON_BACKEND} inc/Stream.h src/Stream.cpp)
 target_include_directories(falcon PUBLIC inc)
 target_link_libraries(falcon PUBLIC spdlog::spdlog_header_only fmt::fmt-header-only)
 
