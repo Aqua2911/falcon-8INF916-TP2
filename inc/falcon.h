@@ -24,9 +24,12 @@ void hello();
 enum MessageType
 {
     CONNECT,
-    ACKNOWLEDGE,
+    CONNECTACK,
     MESSAGE,
     HEARTBEAT,
+    NEWSTREAM,
+    STREAMACK,
+    STREAMDATA,
 };
 
 class Falcon {
@@ -66,6 +69,7 @@ public:
     int ReceiveFrom(std::string& from, std::span<char, 65535> message);
 
     static MessageType GetMessageType(const std::span<char, 65535> message);
+    static MessageType GetMessageType(const std::string& messageType);
     static std::vector<std::string> ParseMessage(const std::span<char, 65535> message, const std::string& delimiter);
     //std::pmr::vector<ClientInfo*> clients;
     // <clientID, clientInfo>
@@ -96,7 +100,7 @@ private:
 
 
     // streams
-    std::unordered_map<uint32_t, std::unique_ptr<Stream>> activeStreams;
+    std::unordered_map<uint32_t, std::unique_ptr<Stream>> activeStreams;    // <streamID, Stream>
     uint32_t nextStreamID = 1;
 };
 

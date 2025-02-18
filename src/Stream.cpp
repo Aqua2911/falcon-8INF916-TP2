@@ -5,8 +5,9 @@
 #include "falcon.h"
 
 
-Stream::Stream(Falcon& from, uint64_t client, uint32_t id, bool reliable) : streamFrom(from), clientID(client), msgID(id), isReliable(reliable) {
+Stream::Stream(Falcon& from, uint64_t client, uint32_t id, bool reliable) : streamFrom(from), clientID(client), streamID(id), isReliable(reliable) {
     streamTo = streamFrom.clients.find(clientID)->second;
+    msgID = 0;
 }
 
 void Stream::SendData(std::span<const char> Data)
@@ -31,6 +32,8 @@ void Stream::SendAck()
     std::string ack = "STREAMACK";
     ack.append("|");
     ack.append(std::to_string(streamFrom.ClientID));
+    ack.append("|");
+    ack.append(std::to_string(streamID));
     ack.append("|");
     if (!receiveBuffer.empty())
     {

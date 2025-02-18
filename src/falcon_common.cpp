@@ -12,37 +12,50 @@ int Falcon::ReceiveFrom(std::string& from, const std::span<char, 65535> message)
 
     auto read_bytes = ReceiveFromInternal(from, message);
 
-    //Server Only
-    if(ClientID == 0)
+    auto splitMessage = ParseMessage(message, "|");
+    const std::string& messageType = splitMessage[0];
+
+    //Test if it's a new client trying to connect
+    if (GetMessageType(message) == MessageType::CONNECT) // splitMessage : CONNECT|
     {
         size_t pos = from.find(':'); // Find the position of the character
         const std::string fromIP = from.substr(0, pos); // substring up to the delimiter
         const std::string fromPort = from.substr(pos + 1);
 
-        //Test if it's a new client trying to connect
-        if (GetMessageType(message) == MessageType::CONNECT)
-        {
-            //Get The Informations of the new Client
-            OnClientConnected(fromIP, stoi(fromPort));
-        }
+        //Get The Informations of the new Client
+        OnClientConnected(fromIP, stoi(fromPort));
+
         UpdateLastHeartbeat(GetSenderID(from));
     }
-    else
+
+    if (GetMessageType(messageType) == MessageType::CONNECTACK)    // splitMessage : CONNECTACK|clientID
     {
-        //Client Only
-        if(ClientID != 0)
+        const std::string& clientID = splitMessage[1];
+        OnConnectionEvent(stoi(clientID));
+    }
+    if (GetMessageType(messageType) == MessageType::NEWSTREAM)  // splitMessage : NEWSTREAM|senderID|isReliable
+    {
+        const uint64_t senderID = std::stoi(splitMessage[1]);
+        const bool isReliable = stoi(splitMessage[2]);
+        OnNewStreamNotificationReceived(senderID, isReliable);
+    }
+    if (GetMessageType(messageType) == MessageType::STREAMACK)  // splitMessage : STREAMACK|senderID|streamID|lastPacketReceived
+    {
+        // TODO : map stream with activeStreams
+        const uint64_t senderID = std::stoi(splitMessage[1]);
+        const uint32_t streamID = std::stoi(splitMessage[2]);
+        const std::string lastPacketReceived = splitMessage[3];
+
+        auto mappedStream = activeStreams.find(streamID);
+        if (mappedStream != activeStreams.end())    // failsafe
         {
-            if (GetMessageType(message) == MessageType::ACKNOWLEDGE)
-            {
-                std::string str(message.data(), message.size());
-                size_t pos = str.find('|'); // Find the position of the character
-                if (pos != std::string::npos)
-                {
-                    const std::string ClientID = str.substr(pos + 1);
-                    OnConnectionEvent(stoi(ClientID));
-                }
-            }
+            mappedStream->second->OnAckReceived(senderID, lastPacketReceived);
         }
+        // else no stream with matching streamID found
+    }
+    if (GetMessageType(messageType) == MessageType::STREAMDATA) // splitMessage : STREAMDATA| .. TODO
+    {
+        // TODO
     }
     return read_bytes;
 }
@@ -90,7 +103,7 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
     //clients.push_back(newClient);
     clients.insert({newClientID, newClient});
 
-    std::string message = "ACKNOWLEDGE|";
+    std::string message = "CONNECTACK|";
     message.append(std::to_string(newClientID));
 
     //Send an Acknowledgement to the Client
@@ -132,8 +145,11 @@ void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
     //        return;
     //    }
     //}
-    ClientInfo* matchedClient = clients.find(clientID)->second;
-    matchedClient->lastHeartbeat = std::chrono::steady_clock::now();
+    auto matchedClient = clients.find(clientID);
+    if (matchedClient != clients.end()) // failsafe
+    {
+        matchedClient->second->lastHeartbeat = std::chrono::steady_clock::now();
+    }
 }
 
 void Falcon::StartCleanUp()
@@ -212,9 +228,9 @@ MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
     {
         return MessageType::CONNECT;
     }
-    else if (str == "ACKNOWLEDGE")
+    else if (str == "CONNECTACK")
     {
-        return MessageType::ACKNOWLEDGE;
+        return MessageType::CONNECTACK;
     }
     else if (str == "HEARTBEAT")
     {
@@ -223,6 +239,37 @@ MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
     else {
         return MessageType::MESSAGE;
     }
+}
+
+MessageType Falcon::GetMessageType(const std::string& messageType) {
+    // parsing of the message should be done beforehand using Falcon::ParseMessage
+
+    if (messageType == "CONNECT")
+    {
+        return MessageType::CONNECT;
+    }
+    if (messageType == "CONNECTACK")
+    {
+        return MessageType::CONNECTACK;
+    }
+    if (messageType == "HEARTBEAT")
+    {
+        return MessageType::HEARTBEAT;
+    }
+    if (messageType == "NEWSTREAM")
+    {
+        return MessageType::NEWSTREAM;
+    }
+    if (messageType == "STREAMACK")
+    {
+        return MessageType::STREAMACK;
+    }
+    if (messageType == "STREAMDATA")
+    {
+        return MessageType::STREAMDATA;
+    }
+
+    return MessageType::MESSAGE;
 }
 
 std::unique_ptr<Stream> Falcon::CreateStream(uint64_t client, bool reliable) {  // Server API
@@ -255,26 +302,17 @@ void Falcon::NotifyNewStream(const Stream& stream)
     std::string message = "NEWSTREAM|";
     message.append(std::to_string(ClientID));
     message.append("|");
-    message.append(std::to_string(isStreamReliable));
+    message.append(std::to_string((int) isStreamReliable));
     SendTo(notificationRecipient->ip, notificationRecipient->port, message);
 }
 
 void Falcon::OnNewStreamNotificationReceived(uint64_t senderID, bool isReliable)
 {
-    // TODO:
-    // get client id -> done (passed as argument)
-    // if client : create stream locally
-    // if server : create stream locally
-    // send ack
+    auto stream = CreateStream(senderID, isReliable); // CreateStream already adds new stream to activeStreams map
 
-    auto stream = CreateStream(senderID, isReliable); // CreateStreams already adds new stream to activeStreams map
-
-    stream.SendAck();
-
-
+    stream->SendAck();
 }
 
-// TODO : use this method where needed (ReceiveFrom(), ...)
 std::vector<std::string> Falcon::ParseMessage(const std::span<char, 65535> message, const std::string& delimiter)
 {
     // source : stackoverflow & chatgpt

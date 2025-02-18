@@ -34,7 +34,7 @@ private:
     ClientInfo* streamTo;
 
     uint64_t clientID;  // id of streamTo client
-    uint32_t msgID; // streamID
+    uint32_t streamID;
+    uint32_t msgID; // TODO: maybe map msgIDs with pendingResends or receiveBuffer or something
     bool isReliable;
-
 };
