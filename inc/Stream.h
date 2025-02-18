@@ -5,10 +5,16 @@
 
 #include <span>
 #include <cstdint>
+#include <vector>
+
+// forward declaration
+class Falcon;
+
+class ClientInfo;
 
 class Stream {
 public:
-    Stream(uint64_t clientID, uint32_t id, bool reliable);
+    Stream(Falcon& from, uint64_t clientID, uint32_t id, bool reliable);
 
     void SendData(std::span<const char> Data);
     void OnDataReceived(std::span<const char> Data);
@@ -16,12 +22,12 @@ public:
     uint32_t GetID() const;
     bool IsReliable() const;
 
+    std::vector<std::span<const char>> pendingResends;
 private:
-    //auto server;
-    //auto client;
+    Falcon& streamFrom;
+    ClientInfo* streamTo;
 
     uint64_t clientID;
-    uint32_t streamID;
+    uint32_t msgID; // streamID
     bool isReliable;
-    std::vector<std::span<const char>> pendingResends;
 };
