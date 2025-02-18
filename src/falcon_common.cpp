@@ -250,20 +250,45 @@ void Falcon::NotifyNewStream(const Stream& stream)
 
     // get notification recipient info
     ClientInfo* notificationRecipient = stream.GetStreamTo();
+    bool isStreamReliable = stream.IsReliable();
 
     std::string message = "NEWSTREAM|";
     message.append(std::to_string(ClientID));
+    message.append("|");
+    message.append(std::to_string(isStreamReliable));
     SendTo(notificationRecipient->ip, notificationRecipient->port, message);
 }
 
-void Falcon::OnNewStreamNotificationRecieved(std::span<const char> message)
+void Falcon::OnNewStreamNotificationReceived(uint64_t senderID, bool isReliable)
 {
     // TODO:
-    // get client id
+    // get client id -> done (passed as argument)
     // if client : create stream locally
     // if server : create stream locally
     // send ack
 
+    auto stream = CreateStream(senderID, isReliable); // CreateStreams already adds new stream to activeStreams map
+
+    stream.SendAck();
+
+
 }
 
+// TODO : use this method where needed (ReceiveFrom(), ...)
+std::vector<std::string> Falcon::ParseMessage(const std::span<char, 65535> message, const std::string& delimiter)
+{
+    // source : stackoverflow & chatgpt
+
+    std::vector<std::string> tokens;
+    std::string_view s(message.data(), message.size()); // Avoids extra allocation
+
+    size_t pos = 0;
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        tokens.emplace_back(s.substr(0, pos)); // Store token
+        s.remove_prefix(pos + delimiter.length()); // Move past delimiter
+    }
+
+    tokens.emplace_back(s); // Add remaining part
+    return tokens;
+}
 

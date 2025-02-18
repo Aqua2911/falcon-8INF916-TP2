@@ -26,6 +26,30 @@ void Stream::OnDataReceived(std::span<const char> Data)
     }
 }
 
+void Stream::SendAck()
+{
+    std::string ack = "STREAMACK";
+    ack.append("|");
+    ack.append(std::to_string(streamFrom.ClientID));
+    ack.append("|");
+    if (!receiveBuffer.empty())
+    {
+        auto last = receiveBuffer.back();
+        std::string lastString(last.data(), last.size());
+        ack.append(lastString);
+    }
+    else
+    {
+        ack.append("0"); // TODO: find better solution
+    }
+    streamFrom.SendTo(streamTo->ip, streamTo->port, ack);
+}
+
+void Stream::OnAckReceived(uint64_t senderID, std::span<const char> lastPacketReceived)
+{
+    // TODO:  if satisfactory ... ?
+}
+
 uint32_t Stream::GetID() const { return msgID; }
 bool Stream::IsReliable() const { return isReliable; }
 

@@ -53,7 +53,7 @@ public:
     std::unique_ptr<Stream> CreateStream(bool reliable); //Client API
     void CloseStream(const Stream& stream); //Server API
     void NotifyNewStream(const Stream& stream);
-    void OnNewStreamNotificationRecieved(std::span<const char> message);
+    void OnNewStreamNotificationReceived(uint64_t senderID, bool isReliable);
 
     Falcon();
     ~Falcon();
@@ -66,9 +66,12 @@ public:
     int ReceiveFrom(std::string& from, std::span<char, 65535> message);
 
     static MessageType GetMessageType(const std::span<char, 65535> message);
+    static std::vector<std::string> ParseMessage(const std::span<char, 65535> message, const std::string& delimiter);
     //std::pmr::vector<ClientInfo*> clients;
     // <clientID, clientInfo>
     std::map<uint64_t, ClientInfo*> clients;
+
+    uint64_t ClientID;
 
 private:
     int SendToInternal(const std::string& to, uint16_t port, std::span<const char> message);
@@ -89,7 +92,6 @@ private:
     //std::thread heartbeatThread;
     std::thread CleanConnectionsThread;
     std::atomic<bool> running{true};
-    uint64_t ClientID;
     SocketType m_socket;
 
 
