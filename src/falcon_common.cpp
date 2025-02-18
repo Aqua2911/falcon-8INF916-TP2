@@ -241,3 +241,29 @@ void Falcon::CloseStream(const Stream &stream) {
     // remove from map and call destructor of stream
     activeStreams.erase(stream.GetID());
 }
+
+void Falcon::NotifyNewStream(const Stream& stream)
+{
+    // NB: uin64_t clientID could be passed as argument,
+    // but we're passing a stream to make sure it actually
+    // exists on the sender-side before the notification is sent
+
+    // get notification recipient info
+    ClientInfo* notificationRecipient = stream.GetStreamTo();
+
+    std::string message = "NEWSTREAM|";
+    message.append(std::to_string(ClientID));
+    SendTo(notificationRecipient->ip, notificationRecipient->port, message);
+}
+
+void Falcon::OnNewStreamNotificationRecieved(std::span<const char> message)
+{
+    // TODO:
+    // get client id
+    // if client : create stream locally
+    // if server : create stream locally
+    // send ack
+
+}
+
+

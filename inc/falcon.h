@@ -52,6 +52,8 @@ public:
     std::unique_ptr<Stream> CreateStream(uint64_t client, bool reliable); //Server API
     std::unique_ptr<Stream> CreateStream(bool reliable); //Client API
     void CloseStream(const Stream& stream); //Server API
+    void NotifyNewStream(const Stream& stream);
+    void OnNewStreamNotificationRecieved(std::span<const char> message);
 
     Falcon();
     ~Falcon();

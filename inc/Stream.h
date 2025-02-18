@@ -20,6 +20,8 @@ public:
     void OnDataReceived(std::span<const char> Data);
 
     uint32_t GetID() const;
+    Falcon& GetStreamFrom() const;
+    ClientInfo* GetStreamTo() const;
     bool IsReliable() const;
 
     std::vector<std::span<const char>> pendingResends;

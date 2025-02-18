@@ -28,3 +28,11 @@ void Stream::OnDataReceived(std::span<const char> Data)
 
 uint32_t Stream::GetID() const { return msgID; }
 bool Stream::IsReliable() const { return isReliable; }
+
+Falcon &Stream::GetStreamFrom() const {
+    return streamFrom;
+}
+
+ClientInfo *Stream::GetStreamTo() const {
+    return streamTo;
+}
