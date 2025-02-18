@@ -7,6 +7,7 @@
 #include <span>
 #include <thread>
 #include <_bsd_types.h>
+#include <map>
 
 #include "ClientInfo.h"
 #include "Stream.h"
@@ -46,6 +47,7 @@ public:
     void OnClientDisconnected(ClientInfo* c); //Server API
     void OnDisconnect(std::function<void> handler);  //Client API
 
+    void OnClientDisconnected(uint64_t clientID); //Server API
 
     std::unique_ptr<Stream> CreateStream(uint64_t client, bool reliable); //Server API
     std::unique_ptr<Stream> CreateStream(bool reliable); //Client API
@@ -62,7 +64,10 @@ public:
     int ReceiveFrom(std::string& from, std::span<char, 65535> message);
 
     static MessageType GetMessageType(const std::span<char, 65535> message);
-    std::pmr::vector<ClientInfo*> clients;
+    //std::pmr::vector<ClientInfo*> clients;
+    // <clientID, clientInfo>
+    std::map<uint64_t, ClientInfo*> clients;
+
 private:
     int SendToInternal(const std::string& to, uint16_t port, std::span<const char> message);
     int ReceiveFromInternal(std::string& from, std::span<char, 65535> message);
@@ -85,9 +90,9 @@ private:
     uint64_t ClientID;
     SocketType m_socket;
 
+
     // streams
-    // map : <client, map : <streamID, Stream>>
-   std::unordered_map<uint32_t, std::unique_ptr<Stream>> activeStreams;
+    std::unordered_map<uint32_t, std::unique_ptr<Stream>> activeStreams;
     uint32_t nextStreamID = 1;
 };
 

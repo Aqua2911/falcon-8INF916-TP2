@@ -55,6 +55,17 @@ void Falcon::ConnectTo(const std::string &ip, uint16_t port)
 void Falcon::OnConnectionEvent(uint64_t newClientID)
 {
     ClientID = newClientID;
+
+    if (!clients.empty())
+    {
+        clients.clear(); // empty clients map so it only has one server at a time
+    }
+    auto* newServer = new ClientInfo;
+    newServer->ip = "127.0.0.1";
+    newServer->port = 5555;
+    newServer->lastHeartbeat = std::chrono::steady_clock::now();
+    uint64_t serverID = 0;
+    clients.insert({serverID, newServer});
 }
 
 void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
@@ -62,7 +73,9 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
     uint64_t newClientID;
     if (!clients.empty())
     {
-        newClientID = ++clients.back()->clientID;
+        //newClientID = ++clients.back()->clientID;
+        uint64_t lastClientID = std::prev(clients.end())->first;
+        newClientID = ++lastClientID;
     }
     else
     {
@@ -70,10 +83,12 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
         StartCleanUp();
     }
     auto* newClient = new ClientInfo;
-    newClient->clientID = newClientID;
+    //newClient->clientID = newClientID;
+    newClient->ip = from;
     newClient->port = clientPort;
     newClient->lastHeartbeat = std::chrono::steady_clock::now();
-    clients.push_back(newClient);
+    //clients.push_back(newClient);
+    clients.insert({newClientID, newClient});
 
     std::string message = "ACKNOWLEDGE|";
     message.append(std::to_string(newClientID));
@@ -83,6 +98,7 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
 
 }
 
+/*
 //Executed on Thread 2
 void Falcon::OnClientDisconnected(ClientInfo *c) {
     auto it = std::ranges::find(clients, c);
@@ -94,17 +110,30 @@ void Falcon::OnClientDisconnected(ClientInfo *c) {
     if (clients.empty())
         StopCleanUp();
 }
+*/
 
-
-void Falcon::UpdateLastHeartbeat(const uint64_t ClientID)
-{
-    for(auto c : clients) {
-        if (c->clientID == ClientID)
-        {
-            c->lastHeartbeat = std::chrono::steady_clock::now();
-            return;
-        }
+void Falcon::OnClientDisconnected(uint64_t clientID) { // not sure if this works i just took the previous version and changed some stuff
+    auto it = clients.find(clientID);
+    if (it != clients.end()) {
+        clients.erase(it);
     }
+    delete it->second;
+    std::cout << "Client Disconnected" << std::endl;
+    if (clients.empty())
+        StopCleanUp();
+}
+
+void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
+{
+    //for(auto c : clients) {
+    //    if (c->clientID == ClientID)
+    //    {
+    //        c->lastHeartbeat = std::chrono::steady_clock::now();
+    //        return;
+    //    }
+    //}
+    ClientInfo* matchedClient = clients.find(clientID)->second;
+    matchedClient->lastHeartbeat = std::chrono::steady_clock::now();
 }
 
 void Falcon::StartCleanUp()
@@ -129,8 +158,8 @@ void Falcon::CleanConnections()
 {
     for (auto c: clients)
     {
-        if (ElapsedTime(c) > 1)
-            OnClientDisconnected(c);
+        if (ElapsedTime(c.second) > 1)
+            OnClientDisconnected(c.first);
     }
 }
 
@@ -161,9 +190,10 @@ uint64_t Falcon::GetSenderID(std::string &from)
     const std::string fromPort = from.substr(pos + 1);
 
     for (auto c: clients) {
-        if (c->port == stoi(fromPort))
+        if (c.second->port == stoi(fromPort))   // c.second is the clientInfo
         {
-            return c->clientID;
+            //return c.second->clientID;
+            return c.first; // c.first is the client id
         }
     }
     return 0;
@@ -197,14 +227,14 @@ MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
 
 std::unique_ptr<Stream> Falcon::CreateStream(uint64_t client, bool reliable) {  // Server API
     // generate unique stream and id
-    auto stream = std::make_unique<Stream>(client, nextStreamID++, reliable);
+    auto stream = std::make_unique<Stream>(*this, client, nextStreamID++, reliable);
 
     activeStreams[stream->GetID()] = std::move(stream);
     return std::move(activeStreams[stream->GetID()]);
 }
 
 std::unique_ptr<Stream> Falcon::CreateStream(bool reliable) {   // Client API
-    return CreateStream(0, reliable);   // 0 as placeholder id
+    return CreateStream(0, reliable);   // 0 is server id
 }
 
 void Falcon::CloseStream(const Stream &stream) {
