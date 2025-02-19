@@ -79,10 +79,6 @@ void Stream::OnAckReceived(uint32_t lastMessageReceivedID)
         // this is a NEWSTREAM ack
     }
 
-    if (lastMessageReceivedID < lastMessageSentID)
-    {
-        for ()
-    }
 
     auto it = std::ranges::find(notYetAcknowledged, lastMessageReceivedID);
     if (it != notYetAcknowledged.end()) {
