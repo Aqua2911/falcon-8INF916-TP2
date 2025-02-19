@@ -42,14 +42,14 @@ int Falcon::ReceiveFrom(std::string& from, const std::span<char, 65535> message)
     if (GetMessageType(messageType) == MessageType::STREAMACK)  // splitMessage : STREAMACK|senderID|streamID|lastMessageReceivedID
     {
         // TODO : map stream with activeStreams
-        const uint64_t senderID = std::stoi(splitMessage[1]);
+        //const uint64_t senderID = std::stoi(splitMessage[1]);
         const uint32_t streamID = std::stoi(splitMessage[2]);
         const uint32_t lastMessageReceivedID = std::stoi(splitMessage[3]);
 
         auto mappedStream = activeStreams.find(streamID);
         if (mappedStream != activeStreams.end())    // failsafe
         {
-            mappedStream->second->OnAckReceived(senderID, lastMessageReceivedID);
+            mappedStream->second->OnAckReceived(lastMessageReceivedID);
         }
         // else no stream with matching streamID found
     }
@@ -312,7 +312,7 @@ void Falcon::OnNewStreamNotificationReceived(uint64_t senderID, bool isReliable)
 {
     auto stream = CreateStream(senderID, isReliable); // CreateStream already adds new stream to activeStreams map
 
-    stream->SendAck();
+    stream->SendAck(0);
 }
 
 std::vector<std::string> Falcon::ParseMessage(const std::span<char, 65535> message, const std::string& delimiter)
