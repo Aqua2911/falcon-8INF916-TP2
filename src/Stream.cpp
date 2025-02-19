@@ -2,8 +2,13 @@
 // Created by grave on 2025-02-11.
 //
 #include "Stream.h"
-#include "falcon.h"
 
+#include <winsock2.h>
+
+#include "falcon.h"
+#include "fmt/format.h"
+
+/*
 struct StreamData {
     std::string messageType;
     uint64_t senderID;
@@ -29,7 +34,7 @@ struct StreamData {
         return parsedData;
     }
 };
-
+*/
 
 Stream::Stream(Falcon& from, uint64_t client, uint32_t id, bool reliable) : streamFrom(from), clientID(client), streamID(id), isReliable(reliable) {
     streamTo = streamFrom.clients.find(clientID)->second;
@@ -38,25 +43,38 @@ Stream::Stream(Falcon& from, uint64_t client, uint32_t id, bool reliable) : stre
 
 void Stream::SendData(std::span<const char> Data)
 {
+    lastMessageSentID++;
     if(isReliable) {
+        std::string dataSTR(Data.data(), Data.size());
         //pendingResends.push_back(std::span<const char>(Data.begin(), Data.end()));
-        messageMap.insert({lastMessageSentID, std::span<const char>(Data.begin(), Data.end())});
+        messageMap.insert({lastMessageSentID, dataSTR});
         notYetAcknowledged.push_back(lastMessageSentID);
+        StartNotYetAcknowledgedLoop();
     }
 
-    streamFrom.SendTo(streamTo->ip, streamTo->port, Data);
+    std::string streamData = "STREAMDATA";
+    streamData.append("|");
+    streamData.append(std::to_string(streamFrom.ClientID));
+    streamData.append("|");
+    streamData.append(std::to_string(streamID));
+    streamData.append("|");
+    streamData.append(std::to_string(lastMessageSentID));
+    streamData.append("|");
+    // Convert to string
+    std::string dataSTR(Data.data(), Data.size());
+    streamData.append(dataSTR);
+
+    streamFrom.SendTo(streamTo->ip, streamTo->port, streamData);
 }
 
-void Stream::OnDataReceived(std::span<const char> Data)
+void Stream::OnDataReceived(uint32_t messageID, std::span<const char> Data)
 {
-    StreamData* parsedData = StreamData::ParseData(Data, "|");
-    messageMap.insert({parsedData->messageID, Data});   // receiver stores data for future processing
+    std::string dataSTR(Data.data(), Data.size());
+    messageMap.insert({messageID, dataSTR});   // receiver stores data for future processing
 
     if (isReliable) {
-        SendAck(parsedData->messageID);
+        SendAck(messageID);
     }
-
-
 }
 
 void Stream::SendAck(uint32_t messageID)
@@ -69,6 +87,7 @@ void Stream::SendAck(uint32_t messageID)
     ack.append("|");
 
     ack.append(std::to_string(messageID));
+    ack.append("|");
     streamFrom.SendTo(streamTo->ip, streamTo->port, ack);
 }
 
@@ -76,19 +95,51 @@ void Stream::OnAckReceived(uint32_t lastMessageReceivedID)
 {
     if (lastMessageReceivedID == 0) // TODO find better solution
     {
-        // this is a NEWSTREAM ack
+        return;
     }
-
 
     auto it = std::ranges::find(notYetAcknowledged, lastMessageReceivedID);
     if (it != notYetAcknowledged.end()) {
         notYetAcknowledged.erase(it);
+        if (notYetAcknowledged.empty())
+        {
+            StopNotYetAcknowledgedLoop();
+        }
     }
     // else do nothing
 }
 
 uint32_t Stream::GetStreamID() const { return streamID; }
 bool Stream::IsReliable() const { return isReliable; }
+
+void Stream::StartNotYetAcknowledgedLoop()
+{
+    NotYetAcknowledgedThread = std::thread(&Stream::NotYetAcknowledgedLoop, this);
+}
+
+void Stream::StopNotYetAcknowledgedLoop() {
+    running.store(false);
+    if (NotYetAcknowledgedThread.joinable() && NotYetAcknowledgedThread.get_id() != std::this_thread::get_id()) {
+        NotYetAcknowledgedThread.join();
+    }
+}
+
+void Stream::CheckNotYetAcknowledged()
+{
+    for (auto msgID: notYetAcknowledged)
+    {
+        auto msg = messageMap.find(msgID);
+        streamFrom.SendTo(streamTo->ip, streamTo->port, msg->second);
+    }
+}
+
+void Stream::NotYetAcknowledgedLoop() {
+    while (running)
+    {
+        CheckNotYetAcknowledged();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+}
 
 Falcon &Stream::GetStreamFrom() const {
     return streamFrom;

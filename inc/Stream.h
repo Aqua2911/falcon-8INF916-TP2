@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <vector>
 #include <map>
+#include <thread>
 
 // forward declaration
 class Falcon;
@@ -18,7 +19,7 @@ public:
     Stream(Falcon& from, uint64_t clientID, uint32_t id, bool reliable);
 
     void SendData(std::span<const char> Data);
-    void OnDataReceived(std::span<const char> Data);
+    void OnDataReceived(uint32_t messageID, std::span<const char> Data);
 
     void SendAck(uint32_t messageID);
     void OnAckReceived(uint32_t lastMessageReceivedID);
@@ -28,7 +29,7 @@ public:
     ClientInfo* GetStreamTo() const;
     bool IsReliable() const;
 
-    std::map<uint32_t, std::span<const char>> messageMap;    // <messageID, message>
+    std::map<uint32_t, std::string> messageMap;    // <messageID, message>
     //std::map<uint32_t, std::span<const char>> receiveBuffer;
     std::vector<uint32_t> notYetAcknowledged;
 private:
@@ -39,4 +40,13 @@ private:
     uint32_t streamID;
     uint32_t lastMessageSentID; // TODO: maybe map msgIDs with pendingResends or receiveBuffer or something
     bool isReliable;
+
+    void StartNotYetAcknowledgedLoop();
+    void StopNotYetAcknowledgedLoop();
+    void CheckNotYetAcknowledged();
+
+    void NotYetAcknowledgedLoop();
+
+    std::thread NotYetAcknowledgedThread;
+    std::atomic<bool> running{true};
 };

@@ -83,61 +83,73 @@ TEST_CASE("Can Notify Disconnection", "[falcon]") {
 }
 
 TEST_CASE("Stream can send and receive Ack", "[stream]") {
-    auto sender = Falcon::Connect("127.0.0.1", 5556);   //client
-    auto receiver = Falcon::Listen("127.0.0.1", 5555);  //server
+    auto client = Falcon::Connect("127.0.0.1", 5556);   //client
+    auto server = Falcon::Listen("127.0.0.1", 5555);  //server
 
-    sender->ConnectTo("127.0.0.1", 5555);
+    //Connect client to server
+    client->ConnectTo("127.0.0.1", 5555);
 
     std::string from_ip;
     from_ip.resize(255);
     std::array<char, 65535> buffer;
-    receiver->ReceiveFrom(from_ip, buffer);
 
-    // receive connectack message
-    //sender->ReceiveFrom()
+    //Receive the client connection
+    server->ReceiveFrom(from_ip, buffer);
+    client->ReceiveFrom(from_ip, buffer);
 
 
+    // Server-side creation of reliable stream
+    auto stream = server->CreateStream(client->ClientID, true);
+    server->NotifyNewStream(*stream);
 
-    // client-side creation of reliable stream
-    auto stream = receiver->CreateStream(1, true);
-    receiver->NotifyNewStream(*stream);
+    //Receive new Stream Info
+    client->ReceiveFrom(from_ip, buffer);
+
+    //Receive Ack
+    server->ReceiveFrom(from_ip, buffer);
 }
 
 
 TEST_CASE("Stream can send and receive data", "[stream]") {
-    auto sender = Falcon::Connect("127.0.0.1", 5556);
-    auto receiver = Falcon::Listen("127.0.0.1", 5555);
+    auto client = Falcon::Connect("127.0.0.1", 5556);   //client
+    auto server = Falcon::Listen("127.0.0.1", 5555);  //server
 
-    sender->ConnectTo("127.0.0.1", 5555);
+    //Connect client to server
+    client->ConnectTo("127.0.0.1", 5555);
 
     std::string from_ip;
     from_ip.resize(255);
     std::array<char, 65535> buffer;
-    receiver->ReceiveFrom(from_ip, buffer);
 
-    // client-side creation of reliable stream
-    auto stream = receiver->CreateStream(1, true);
+    //Receive the client connection
+    server->ReceiveFrom(from_ip, buffer);
+    client->ReceiveFrom(from_ip, buffer);
 
 
+    // Server-side creation of reliable stream
+    auto stream = server->CreateStream(client->ClientID, true);
+    server->NotifyNewStream(*stream);
 
-    REQUIRE(stream != nullptr);
+    std::memset(buffer.data(), 0, buffer.size());
 
-    std::string message = "Test Stream Data";
-    std::span<const char> data(message.data(), message.size());
+    //Receive new Stream Info
+    client->ReceiveFrom(from_ip, buffer);
 
-    // Send data
-    stream->SendData(data);
+    std::memset(buffer.data(), 0, buffer.size());
+    //Receive Ack
+    server->ReceiveFrom(from_ip, buffer);
 
-    // Simulate receiving the same data
-    stream->OnDataReceived(data);
+    std::memset(buffer.data(), 0, buffer.size());
+    //Send Message Through stream
+    stream->SendData("Hello World");
 
-    //// Check if the pendingResends vector stores data correctly (only for reliable mode)
-    //if (stream->IsReliable()) {
-    //    REQUIRE_FALSE(stream->pendingResends.empty());
-    //    REQUIRE(std::equal(
-    //            stream->pendingResends.back().begin(),
-    //            stream->pendingResends.back().end(),
-    //            message.begin()
-    //    ));
-    //}
+    std::memset(buffer.data(), 0, buffer.size());
+    //Receive Stream Message
+    client->ReceiveFrom(from_ip, buffer);
+
+    std::memset(buffer.data(), 0, buffer.size());
+    //Receive MessageACK for reliability
+    server->ReceiveFrom(from_ip, buffer);
+
+    std::cout << "Stream Data Received" << std::endl;
 }

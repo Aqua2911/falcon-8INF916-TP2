@@ -55,7 +55,16 @@ int Falcon::ReceiveFrom(std::string& from, const std::span<char, 65535> message)
     }
     if (GetMessageType(messageType) == MessageType::STREAMDATA) // splitMessage : STREAMDATA| .. TODO
     {
-        // TODO
+         const uint64_t senderID = std::stoi(splitMessage[1]);
+        const uint32_t streamID = std::stoi(splitMessage[2]);
+        const uint32_t messageID = std::stoi(splitMessage[3]);
+        const std::string data = splitMessage[4];
+
+        auto mappedStream = activeStreams.find(streamID);
+        if (mappedStream != activeStreams.end())    // failsafe
+        {
+            mappedStream->second->OnDataReceived(messageID, data);
+        }
     }
     return read_bytes;
 }
@@ -274,15 +283,15 @@ MessageType Falcon::GetMessageType(const std::string& messageType) {    // updat
     return MessageType::MESSAGE;
 }
 
-std::unique_ptr<Stream> Falcon::CreateStream(uint64_t client, bool reliable) {  // Server API
+std::shared_ptr<Stream> Falcon::CreateStream(uint64_t client, bool reliable) {  // Server API
     // generate unique stream and id
-    auto stream = std::make_unique<Stream>(*this, client, nextStreamID++, reliable);
 
-    activeStreams[stream->GetStreamID()] = std::move(stream);
-    return std::move(activeStreams[stream->GetStreamID()]);
+    activeStreams[nextStreamID] = std::make_shared<Stream>(*this, client, nextStreamID, reliable);
+    nextStreamID++;
+    return activeStreams[nextStreamID - 1];
 }
 
-std::unique_ptr<Stream> Falcon::CreateStream(bool reliable) {   // Client API
+std::shared_ptr<Stream> Falcon::CreateStream(bool reliable) {   // Client API
     return CreateStream(0, reliable);   // 0 is server id
 }
 

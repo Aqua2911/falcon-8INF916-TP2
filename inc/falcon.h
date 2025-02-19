@@ -52,8 +52,8 @@ public:
 
     void OnClientDisconnected(uint64_t clientID); //Server API
 
-    std::unique_ptr<Stream> CreateStream(uint64_t client, bool reliable); //Server API
-    std::unique_ptr<Stream> CreateStream(bool reliable); //Client API
+    std::shared_ptr<Stream> CreateStream(uint64_t client, bool reliable); //Server API
+    std::shared_ptr<Stream> CreateStream(bool reliable); //Client API
     void CloseStream(const Stream& stream); //Server API
     void NotifyNewStream(const Stream& stream);
     void OnNewStreamNotificationReceived(uint64_t senderID, bool isReliable);
@@ -100,7 +100,7 @@ private:
 
 
     // streams
-    std::unordered_map<uint32_t, std::unique_ptr<Stream>> activeStreams;    // <streamID, Stream>
+    std::unordered_map<uint32_t, std::shared_ptr<Stream>> activeStreams;    // <streamID, Stream>
     uint32_t nextStreamID = 1;
 };
 
