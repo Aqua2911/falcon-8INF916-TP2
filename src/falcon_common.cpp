@@ -39,17 +39,17 @@ int Falcon::ReceiveFrom(std::string& from, const std::span<char, 65535> message)
         const bool isReliable = stoi(splitMessage[2]);
         OnNewStreamNotificationReceived(senderID, isReliable);
     }
-    if (GetMessageType(messageType) == MessageType::STREAMACK)  // splitMessage : STREAMACK|senderID|streamID|lastPacketReceived
+    if (GetMessageType(messageType) == MessageType::STREAMACK)  // splitMessage : STREAMACK|senderID|streamID|lastMessageReceivedID
     {
         // TODO : map stream with activeStreams
         const uint64_t senderID = std::stoi(splitMessage[1]);
         const uint32_t streamID = std::stoi(splitMessage[2]);
-        const std::string lastPacketReceived = splitMessage[3];
+        const uint32_t lastMessageReceivedID = std::stoi(splitMessage[3]);
 
         auto mappedStream = activeStreams.find(streamID);
         if (mappedStream != activeStreams.end())    // failsafe
         {
-            mappedStream->second->OnAckReceived(senderID, lastPacketReceived);
+            mappedStream->second->OnAckReceived(senderID, lastMessageReceivedID);
         }
         // else no stream with matching streamID found
     }
@@ -65,10 +65,11 @@ void Falcon::ConnectTo(const std::string &ip, uint16_t port)
     SendToInternal(ip, port, "CONNECT|");
 }
 
-void Falcon::OnConnectionEvent(uint64_t newClientID)
+void Falcon::OnConnectionEvent(uint64_t newClientID)    // client API
 {
     ClientID = newClientID;
 
+    // add server to "clients" map
     if (!clients.empty())
     {
         clients.clear(); // empty clients map so it only has one server at a time
@@ -81,7 +82,7 @@ void Falcon::OnConnectionEvent(uint64_t newClientID)
     clients.insert({serverID, newServer});
 }
 
-void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)
+void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    // server API
 {
     uint64_t newClientID;
     if (!clients.empty())
@@ -125,7 +126,8 @@ void Falcon::OnClientDisconnected(ClientInfo *c) {
 }
 */
 
-void Falcon::OnClientDisconnected(uint64_t clientID) { // not sure if this works i just took the previous version and changed some stuff
+void Falcon::OnClientDisconnected(uint64_t clientID)    // not sure if this works i just took the previous version and changed some stuff
+{
     auto it = clients.find(clientID);
     if (it != clients.end()) {
         clients.erase(it);
@@ -241,7 +243,7 @@ MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
     }
 }
 
-MessageType Falcon::GetMessageType(const std::string& messageType) {
+MessageType Falcon::GetMessageType(const std::string& messageType) {    // updated version
     // parsing of the message should be done beforehand using Falcon::ParseMessage
 
     if (messageType == "CONNECT")
@@ -276,8 +278,8 @@ std::unique_ptr<Stream> Falcon::CreateStream(uint64_t client, bool reliable) {  
     // generate unique stream and id
     auto stream = std::make_unique<Stream>(*this, client, nextStreamID++, reliable);
 
-    activeStreams[stream->GetID()] = std::move(stream);
-    return std::move(activeStreams[stream->GetID()]);
+    activeStreams[stream->GetStreamID()] = std::move(stream);
+    return std::move(activeStreams[stream->GetStreamID()]);
 }
 
 std::unique_ptr<Stream> Falcon::CreateStream(bool reliable) {   // Client API
@@ -286,7 +288,7 @@ std::unique_ptr<Stream> Falcon::CreateStream(bool reliable) {   // Client API
 
 void Falcon::CloseStream(const Stream &stream) {
     // remove from map and call destructor of stream
-    activeStreams.erase(stream.GetID());
+    activeStreams.erase(stream.GetStreamID());
 }
 
 void Falcon::NotifyNewStream(const Stream& stream)
