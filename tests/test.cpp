@@ -82,6 +82,28 @@ TEST_CASE("Can Notify Disconnection", "[falcon]") {
     REQUIRE(receiver->clients.empty());
 }
 
+TEST_CASE("Stream can send and receive Ack", "[stream]") {
+    auto sender = Falcon::Connect("127.0.0.1", 5556);   //client
+    auto receiver = Falcon::Listen("127.0.0.1", 5555);  //server
+
+    sender->ConnectTo("127.0.0.1", 5555);
+
+    std::string from_ip;
+    from_ip.resize(255);
+    std::array<char, 65535> buffer;
+    receiver->ReceiveFrom(from_ip, buffer);
+
+    // receive connectack message
+    //sender->ReceiveFrom()
+
+
+
+    // client-side creation of reliable stream
+    auto stream = receiver->CreateStream(1, true);
+    receiver->NotifyNewStream(*stream);
+}
+
+
 TEST_CASE("Stream can send and receive data", "[stream]") {
     auto sender = Falcon::Connect("127.0.0.1", 5556);
     auto receiver = Falcon::Listen("127.0.0.1", 5555);
