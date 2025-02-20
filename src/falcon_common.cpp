@@ -96,7 +96,6 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
     uint64_t newClientID;
     if (!clients.empty())
     {
-        //newClientID = ++clients.back()->clientID;
         uint64_t lastClientID = std::prev(clients.end())->first;
         newClientID = ++lastClientID;
     }
@@ -121,19 +120,8 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
 
 }
 
-/*
+
 //Executed on Thread 2
-void Falcon::OnClientDisconnected(ClientInfo *c) {
-    auto it = std::ranges::find(clients, c);
-    if (it != clients.end()) {
-        clients.erase(it);
-    }
-    delete c;
-    std::cout << "Client Disconnected" << std::endl;
-    if (clients.empty())
-        StopCleanUp();
-}
-*/
 
 void Falcon::OnClientDisconnected(uint64_t clientID)    // not sure if this works i just took the previous version and changed some stuff
 {
@@ -149,13 +137,6 @@ void Falcon::OnClientDisconnected(uint64_t clientID)    // not sure if this work
 
 void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
 {
-    //for(auto c : clients) {
-    //    if (c->clientID == ClientID)
-    //    {
-    //        c->lastHeartbeat = std::chrono::steady_clock::now();
-    //        return;
-    //    }
-    //}
     auto matchedClient = clients.find(clientID);
     if (matchedClient != clients.end()) // failsafe
     {
@@ -219,37 +200,10 @@ uint64_t Falcon::GetSenderID(std::string &from)
     for (auto c: clients) {
         if (c.second->port == stoi(fromPort))   // c.second is the clientInfo
         {
-            //return c.second->clientID;
             return c.first; // c.first is the client id
         }
     }
     return 0;
-}
-
-MessageType Falcon::GetMessageType(const std::span<char, 65535> message) {
-    // Convert to string
-    std::string str(message.data(), message.size());
-
-    size_t pos = str.find('|'); // Find the position of the character
-    if (pos != std::string::npos) {
-        str = str.substr(0, pos); // substring up to the delimiter
-    }
-
-    if (str == "CONNECT")
-    {
-        return MessageType::CONNECT;
-    }
-    else if (str == "CONNECTACK")
-    {
-        return MessageType::CONNECTACK;
-    }
-    else if (str == "HEARTBEAT")
-    {
-        return MessageType::HEARTBEAT;
-    }
-    else {
-        return MessageType::MESSAGE;
-    }
 }
 
 MessageType Falcon::GetMessageType(const std::string& messageType) {    // updated version
