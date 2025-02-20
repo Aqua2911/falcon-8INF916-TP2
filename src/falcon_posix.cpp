@@ -60,7 +60,9 @@ sockaddr StringToIp(const std::string& ip, uint16_t port)
 }
 
 Falcon::Falcon() {
-
+    // set recvfrom as non-blocking
+    int flags = fcntl(m_socket, F_GETFL, 0);
+    fcntl(m_socket, F_SETFL, flags | O_NONBLOCK);
 }
 
 Falcon::~Falcon() {
