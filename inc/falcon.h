@@ -102,6 +102,13 @@ private:
     // streams
     std::unordered_map<uint32_t, std::shared_ptr<Stream>> activeStreams;    // <streamID, Stream>
     uint32_t nextStreamID = 1;
+
+    std::function<void()> handler;
+    std::vector<std::pair<ClientInfo*, std::span<const char>>> messagesToBeSent;    // <recipient, message> pairs
+
+    void Update();
+    void AddMessageToSendBuffer(uint64_t receiverID, std::span<const char> message);
+
 };
 
 /*

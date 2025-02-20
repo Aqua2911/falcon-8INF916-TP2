@@ -295,3 +295,40 @@ std::vector<std::string> Falcon::ParseMessage(const std::span<char, 65535> messa
     return tokens;
 }
 
+void Falcon::AddMessageToSendBuffer(uint64_t receiverID, std::span<const char> message)
+{
+    // find ClientInfo* based on ID
+    auto matchedClient = clients.find(receiverID);
+    if (matchedClient != clients.end())
+    {
+        messagesToBeSent.push_back( {matchedClient->second, message} );
+    }
+}
+
+void Falcon::Update()
+{
+    if (handler != nullptr)
+    {
+        handler();  // TODO : find out how it works with the arguments and stuff, maybe one handler per event type ? ...
+
+        // reset handler
+        handler = nullptr;
+    }
+    // i realize this if statement isn't necessary and the loop would be enough but it makes it easier to understand the code i think
+    if (!messagesToBeSent.empty())
+    {
+        // send every message
+        for (auto message : messagesToBeSent)
+        {
+            SendTo(message.first->ip, message.first->port, message.second);
+        }
+        // delete messages from queue
+        messagesToBeSent.clear();
+    }
+}
+
+// TODO:    - create while loop for reception of message
+//          - create while loop that calls Falcon::Update()
+//          - add ack messages to message queue instead of calling sendack() (or maybe change sendack to add ack message to queue)
+//          - make it so stream adds message to queue instead of calling sendto
+//          - use handlers for event management
