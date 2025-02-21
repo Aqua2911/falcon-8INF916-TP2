@@ -240,7 +240,7 @@ MessageType Falcon::GetMessageType(const std::string& messageType) {    // updat
 std::shared_ptr<Stream> Falcon::CreateStream(uint64_t client, bool reliable) {  // Server API
     // generate unique stream and id
 
-    activeStreams[nextStreamID] = std::make_shared<Stream>(*this, client, nextStreamID, reliable);
+    activeStreams[nextStreamID] = std::make_shared<Stream>(ClientID, client, nextStreamID, reliable);
     nextStreamID++;
     return activeStreams[nextStreamID - 1];
 }
@@ -261,14 +261,15 @@ void Falcon::NotifyNewStream(const Stream& stream)
     // exists on the sender-side before the notification is sent
 
     // get notification recipient info
-    ClientInfo* notificationRecipient = stream.GetStreamTo();
+    uint64_t notificationRecipient = stream.GetReceiverID();
     bool isStreamReliable = stream.IsReliable();
 
     std::string message = "NEWSTREAM|";
     message.append(std::to_string(ClientID));
     message.append("|");
     message.append(std::to_string((int) isStreamReliable));
-    SendTo(notificationRecipient->ip, notificationRecipient->port, message);
+
+    AddMessageToSendBuffer(notificationRecipient, message);
 }
 
 void Falcon::OnNewStreamNotificationReceived(uint64_t senderID, bool isReliable)
@@ -297,12 +298,7 @@ std::vector<std::string> Falcon::ParseMessage(const std::span<char, 65535> messa
 
 void Falcon::AddMessageToSendBuffer(uint64_t receiverID, std::span<const char> message)
 {
-    // find ClientInfo* based on ID
-    auto matchedClient = clients.find(receiverID);
-    if (matchedClient != clients.end())
-    {
-        messagesToBeSent.push_back( {matchedClient->second, message} );
-    }
+    messagesToBeSent.push_back( {receiverID, message} );
 }
 
 void Falcon::Update()
@@ -314,13 +310,27 @@ void Falcon::Update()
         // reset handler
         handler = nullptr;
     }
+
+    for (const auto &[streamID, stream] : activeStreams)
+    {
+        if (stream->HasDataToBeSent())
+        {
+            stream->WriteDataToBuffer(messagesToBeSent);
+        }
+    }
+
     // i realize this if statement isn't necessary and the loop would be enough but it makes it easier to understand the code i think
     if (!messagesToBeSent.empty())
     {
         // send every message
-        for (auto message : messagesToBeSent)
+        for (const auto &[receiverID, message] : messagesToBeSent)
         {
-            SendTo(message.first->ip, message.first->port, message.second);
+            // map receiverID with ip and port from clients vector
+            auto matchedReceiver = clients.find(receiverID);
+            if (matchedReceiver != clients.end()) // failsafe
+            {
+                SendTo(matchedReceiver->second->ip, matchedReceiver->second->port, message);
+            }
         }
         // delete messages from queue
         messagesToBeSent.clear();
@@ -332,3 +342,4 @@ void Falcon::Update()
 //          - add ack messages to message queue instead of calling sendack() (or maybe change sendack to add ack message to queue)
 //          - make it so stream adds message to queue instead of calling sendto
 //          - use handlers for event management
+//          - send notification that stream had been closed

@@ -9,14 +9,9 @@
 #include <map>
 #include <thread>
 
-// forward declaration
-class Falcon;
-
-class ClientInfo;
-
 class Stream {
 public:
-    Stream(Falcon& from, uint64_t clientID, uint32_t id, bool reliable);
+    Stream(uint64_t senderID, uint64_t receiverID, uint32_t id, bool reliable);
 
     void SendData(std::span<const char> Data);
     void OnDataReceived(uint32_t messageID, std::span<const char> Data);
@@ -25,20 +20,22 @@ public:
     void OnAckReceived(uint32_t lastMessageReceivedID);
 
     uint32_t GetStreamID() const;
-    Falcon& GetStreamFrom() const;
-    ClientInfo* GetStreamTo() const;
     bool IsReliable() const;
+    bool HasDataToBeSent() const;
+    uint64_t GetReceiverID() const;
 
     std::map<uint32_t, std::string> messageMap;    // <messageID, message>
     //std::map<uint32_t, std::span<const char>> receiveBuffer;
     std::vector<uint32_t> notYetAcknowledged;
-private:
-    Falcon& streamFrom;
-    ClientInfo* streamTo;
 
-    uint64_t clientID;  // id of streamTo client
-    uint32_t streamID;
-    uint32_t lastMessageSentID; // TODO: maybe map msgIDs with pendingResends or receiveBuffer or something
+    void WriteDataToBuffer(std::vector<std::pair<uint64_t, std::span<const char>>> &buffer);
+
+private:
+    const uint64_t senderID;
+    const uint64_t receiverID;
+
+    const uint32_t streamID;
+    uint32_t lastMessageSentID;
     bool isReliable;
 
     void StartNotYetAcknowledgedLoop();
@@ -49,4 +46,8 @@ private:
 
     std::thread NotYetAcknowledgedThread;
     std::atomic<bool> running{true};
+
+
+    std::vector<std::span<const char>> dataToBeSent;
+    bool hasDataToBeSent;
 };

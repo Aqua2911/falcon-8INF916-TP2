@@ -104,7 +104,7 @@ private:
     uint32_t nextStreamID = 1;
 
     std::function<void()> handler;
-    std::vector<std::pair<ClientInfo*, std::span<const char>>> messagesToBeSent;    // <recipient, message> pairs
+    std::vector<std::pair<uint64_t, std::span<const char>>> messagesToBeSent;    // <receiverID, message> pairs
 
     void Update();
     void AddMessageToSendBuffer(uint64_t receiverID, std::span<const char> message);

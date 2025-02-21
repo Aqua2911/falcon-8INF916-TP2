@@ -8,36 +8,8 @@
 #include "falcon.h"
 #include "fmt/format.h"
 
-/*
-struct StreamData {
-    std::string messageType;
-    uint64_t senderID;
-    uint32_t streamID;
-    uint32_t messageID;
-    std::string data;   // TODO : do better
 
-    static StreamData* ParseData(std::span<const char> Data, const std::string& delimiter) {
-        std::vector<std::string> tokens;
-        std::string_view s(Data.data(), Data.size()); // Avoids extra allocation
-
-        size_t pos = 0;
-        while ((pos = s.find(delimiter)) != std::string::npos) {
-            tokens.emplace_back(s.substr(0, pos)); // Store token
-            s.remove_prefix(pos + delimiter.length()); // Move past delimiter
-        }
-
-        tokens.emplace_back(s); // Add remaining part
-
-        auto parsedData = new StreamData;
-        parsedData->messageType = tokens[0];
-
-        return parsedData;
-    }
-};
-*/
-
-Stream::Stream(Falcon& from, uint64_t client, uint32_t id, bool reliable) : streamFrom(from), clientID(client), streamID(id), isReliable(reliable) {
-    streamTo = streamFrom.clients.find(clientID)->second;
+Stream::Stream(uint64_t senderID, uint64_t receiverID, uint32_t id, bool reliable) : senderID(senderID),receiverID(receiverID), streamID(id), isReliable(reliable) {
     lastMessageSentID = 0;
 }
 
@@ -54,7 +26,7 @@ void Stream::SendData(std::span<const char> Data)
 
     std::string streamData = "STREAMDATA";
     streamData.append("|");
-    streamData.append(std::to_string(streamFrom.ClientID));
+    streamData.append(std::to_string(senderID));
     streamData.append("|");
     streamData.append(std::to_string(streamID));
     streamData.append("|");
@@ -64,7 +36,8 @@ void Stream::SendData(std::span<const char> Data)
     std::string dataSTR(Data.data(), Data.size());
     streamData.append(dataSTR);
 
-    streamFrom.SendTo(streamTo->ip, streamTo->port, streamData);
+    // add data to buffer to be sent by falcon
+    dataToBeSent.push_back(streamData);
 }
 
 void Stream::OnDataReceived(uint32_t messageID, std::span<const char> Data)
@@ -81,14 +54,16 @@ void Stream::SendAck(uint32_t messageID)
 {
     std::string ack = "STREAMACK";
     ack.append("|");
-    ack.append(std::to_string(streamFrom.ClientID));
+    ack.append(std::to_string(senderID));
     ack.append("|");
     ack.append(std::to_string(streamID));
     ack.append("|");
 
     ack.append(std::to_string(messageID));
     ack.append("|");
-    streamFrom.SendTo(streamTo->ip, streamTo->port, ack);
+
+    // add message to data buffer
+    dataToBeSent.push_back(ack);
 }
 
 void Stream::OnAckReceived(uint32_t lastMessageReceivedID)
@@ -109,9 +84,6 @@ void Stream::OnAckReceived(uint32_t lastMessageReceivedID)
     // else do nothing
 }
 
-uint32_t Stream::GetStreamID() const { return streamID; }
-bool Stream::IsReliable() const { return isReliable; }
-
 void Stream::StartNotYetAcknowledgedLoop()
 {
     NotYetAcknowledgedThread = std::thread(&Stream::NotYetAcknowledgedLoop, this);
@@ -129,7 +101,7 @@ void Stream::CheckNotYetAcknowledged()
     for (auto msgID: notYetAcknowledged)
     {
         auto msg = messageMap.find(msgID);
-        streamFrom.SendTo(streamTo->ip, streamTo->port, msg->second);
+        dataToBeSent.push_back(msg->second);
     }
 }
 
@@ -141,10 +113,25 @@ void Stream::NotYetAcknowledgedLoop() {
     }
 }
 
-Falcon &Stream::GetStreamFrom() const {
-    return streamFrom;
+void Stream::WriteDataToBuffer(std::vector<std::pair<uint64_t, std::span<const char>>> &buffer)
+{
+    for (const auto &data : dataToBeSent)
+    {
+        buffer.push_back({receiverID, data});
+    }
+    // clear data buffer once data is copied
+    dataToBeSent.clear();
+    hasDataToBeSent = !dataToBeSent.empty();
 }
 
-ClientInfo *Stream::GetStreamTo() const {
-    return streamTo;
+
+uint32_t Stream::GetStreamID() const { return streamID; }
+bool Stream::IsReliable() const { return isReliable; }
+
+bool Stream::HasDataToBeSent() const {
+    return hasDataToBeSent;
+}
+
+uint64_t Stream::GetReceiverID() const {
+    return receiverID;
 }
