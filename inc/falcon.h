@@ -36,12 +36,16 @@ class Falcon {
 public:
     //Server
     static std::unique_ptr<Falcon> Listen(const std::string& endpoint, uint16_t port);
-    void OnClientConnected(const std::string &from, uint16_t clientPort);
+    //void OnClientConnected(const std::string &from, uint16_t clientPort);
+
+    void Listen(uint16_t port);
+    void OnClientConnected(std::function<void(uint64_t)> handler);
 
     //Client
     static std::unique_ptr<Falcon> Connect(const std::string& serverIp, uint16_t port);
     void ConnectTo(const std::string& ip, uint16_t port);
-    void OnConnectionEvent(uint64_t newClientID); //Here the bool represent the success of the connection
+    //void OnConnectionEvent(uint64_t newClientID); //Here the bool represent the success of the connection
+    void OnConnectionEvent(uint64_t clientID, std::function<void(bool, uint64_t)> handler); //Here the bool represent the success of the connection
 
     //void StartHeartbeat();
     void StartCleanUp();
@@ -68,7 +72,6 @@ public:
     int SendTo(const std::string& to, uint16_t port, std::span<const char> message);
     int ReceiveFrom(std::string& from, std::span<char, 65535> message);
 
-    static MessageType GetMessageType(const std::span<char, 65535> message);
     static MessageType GetMessageType(const std::string& messageType);
     static std::vector<std::string> ParseMessage(const std::span<char, 65535> message, const std::string& delimiter);
     //std::pmr::vector<ClientInfo*> clients;
@@ -104,9 +107,13 @@ private:
     uint32_t nextStreamID = 1;
 
     std::function<void()> handler;
+    std::function<void(uint64_t)> clientConnectedHandler;
+    std::function<void(bool, uint64_t)> connectionHandler;
     std::vector<std::pair<uint64_t, std::span<const char>>> messagesToBeSent;    // <receiverID, message> pairs
 
     void Update();
+    //void DecodeMessage(std::span<char, 65535> message);
+    void DecodeMessage(std::string from, std::span<char, 65535> message);
     void AddMessageToSendBuffer(uint64_t receiverID, std::span<const char> message);
 
 };
