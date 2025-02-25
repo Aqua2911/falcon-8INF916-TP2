@@ -60,9 +60,7 @@ sockaddr StringToIp(const std::string& ip, uint16_t port)
 }
 
 Falcon::Falcon() {
-    // set recvfrom as non-blocking
-    int flags = fcntl(m_socket, F_GETFL, 0);
-    fcntl(m_socket, F_SETFL, flags | O_NONBLOCK);
+
 }
 
 Falcon::~Falcon() {
@@ -85,6 +83,10 @@ std::unique_ptr<Falcon> Falcon::Listen(const std::string& endpoint, uint16_t por
         return nullptr;
     }
 
+    // set recvfrom as non-blocking
+    int flags = fcntl(falcon->m_socket, F_GETFL, 0);
+    fcntl(falcon->m_socket, F_SETFL, flags | O_NONBLOCK);
+
     return falcon;
 }
 
@@ -100,6 +102,10 @@ std::unique_ptr<Falcon> Falcon::Connect(const std::string& serverIp, uint16_t po
         close(falcon->m_socket);
         return nullptr;
     }
+
+    // set recvfrom as non-blocking
+    int flags = fcntl(falcon->m_socket, F_GETFL, 0);
+    fcntl(falcon->m_socket, F_SETFL, flags | O_NONBLOCK);
 
     return falcon;
 }

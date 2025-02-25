@@ -83,10 +83,6 @@ sockaddr StringToIp(const std::string& ip, uint16_t port)
 Falcon::Falcon()
 {
     static WinSockInitializer winsockInitializer{};
-
-    // set recvfrom as non-blocking
-    u_long mode = 1;
-    ioctlsocket(m_socket, FIONBIO, &mode);
 }
 
 Falcon::~Falcon() {
@@ -110,6 +106,11 @@ std::unique_ptr<Falcon> Falcon::Listen(const std::string& endpoint, uint16_t por
         return nullptr;
     }
 
+
+    // set recvfrom as non-blocking
+    u_long mode = 1;
+    ioctlsocket(falcon->m_socket, FIONBIO, &mode);
+
     falcon->ClientID = 0;
     return falcon;
 }
@@ -126,6 +127,10 @@ std::unique_ptr<Falcon> Falcon::Connect(const std::string& serverIp, uint16_t po
         closesocket(falcon->m_socket);
         return nullptr;
     }
+
+    // set recvfrom as non-blocking
+    u_long mode = 1;
+    ioctlsocket(falcon->m_socket, FIONBIO, &mode);
 
     return falcon;
 }
