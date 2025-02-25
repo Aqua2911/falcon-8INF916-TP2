@@ -36,16 +36,20 @@ class Falcon {
 public:
     //Server
     static std::unique_ptr<Falcon> Listen(const std::string& endpoint, uint16_t port);
-    //void OnClientConnected(const std::string &from, uint16_t clientPort);
+    void OnClientConnected(const std::string &from, uint16_t clientPort);
 
     void Listen(uint16_t port);
-    void OnClientConnected(std::function<void(uint64_t)> handler);
+    //void OnClientConnected(std::function<void(uint64_t)> handler);
 
     //Client
     static std::unique_ptr<Falcon> Connect(const std::string& serverIp, uint16_t port);
     void ConnectTo(const std::string& ip, uint16_t port);
-    //void OnConnectionEvent(uint64_t newClientID); //Here the bool represent the success of the connection
-    void OnConnectionEvent(uint64_t clientID, std::function<void(bool, uint64_t)> handler); //Here the bool represent the success of the connection
+    void OnConnectionEvent(uint64_t newClientID); //Here the bool represent the success of the connection
+    //void OnConnectionEvent(uint64_t clientID, std::function<void(bool, uint64_t)> handler); //Here the bool represent the success of the connection
+
+    void StartListening(uint16_t port);
+    void StopListening();
+
 
     //void StartHeartbeat();
     void StartCleanUp();
@@ -74,7 +78,7 @@ public:
 
     static MessageType GetMessageType(const std::string& messageType);
     static std::vector<std::string> ParseMessage(const std::span<char, 65535> message, const std::string& delimiter);
-    //std::pmr::vector<ClientInfo*> clients;
+
     // <clientID, clientInfo>
     std::map<uint64_t, ClientInfo*> clients;
 
@@ -98,23 +102,29 @@ private:
 
     //std::thread heartbeatThread;
     std::thread CleanConnectionsThread;
-    std::atomic<bool> running{true};
+    //std::atomic<bool> running{true};
     SocketType m_socket;
 
+    // threads
+    std::thread updateThread;
+    std::thread listenThread;
+    std::atomic<bool> running = false;
 
     // streams
     std::unordered_map<uint32_t, std::shared_ptr<Stream>> activeStreams;    // <streamID, Stream>
     uint32_t nextStreamID = 1;
 
-    std::function<void()> handler;
-    std::function<void(uint64_t)> clientConnectedHandler;
-    std::function<void(bool, uint64_t)> connectionHandler;
-    std::vector<std::pair<uint64_t, std::span<const char>>> messagesToBeSent;    // <receiverID, message> pairs
+    //std::function<void()> handler;
+    //std::function<void(uint64_t)> clientConnectedHandler;
+    //std::function<void(bool, uint64_t)> connectionHandler;
+    std::vector<std::pair<uint64_t, std::vector<char>>> messagesToBeSent;    // <receiverID, message> pairs
+    std::vector<std::pair<std::string, std::vector<char>>> messagesReceived;   // <from, message> pairs
+    // FIXME : not sure about using std::vector but this prevents the memory being deleted while it's being used (which happens with spans)
 
     void Update();
-    //void DecodeMessage(std::span<char, 65535> message);
-    void DecodeMessage(std::string from, std::span<char, 65535> message);
-    void AddMessageToSendBuffer(uint64_t receiverID, std::span<const char> message);
+    void UpdateLoop();
+    void DecodeMessage(const std::string& from, std::vector<char> message);
+    void AddMessageToSendBuffer(uint64_t receiverID, std::vector<char> message);
 
 };
 

@@ -28,7 +28,7 @@ public:
     //std::map<uint32_t, std::span<const char>> receiveBuffer;
     std::vector<uint32_t> notYetAcknowledged;
 
-    void WriteDataToBuffer(std::vector<std::pair<uint64_t, std::span<const char>>> &buffer);
+    void WriteDataToBuffer(std::vector<std::pair<uint64_t, std::vector<char>>> &buffer);
 
 private:
     const uint64_t senderID;
@@ -48,6 +48,6 @@ private:
     std::atomic<bool> running{true};
 
 
-    std::vector<std::span<const char>> dataToBeSent;
+    std::vector<std::vector<char>> dataToBeSent;
     bool hasDataToBeSent;
 };

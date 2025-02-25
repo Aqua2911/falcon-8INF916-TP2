@@ -94,7 +94,7 @@ Falcon::~Falcon() {
     {
         closesocket(m_socket);
     }
-    StopCleanUp();
+    //StopCleanUp();
 }
 
 std::unique_ptr<Falcon> Falcon::Listen(const std::string& endpoint, uint16_t port)

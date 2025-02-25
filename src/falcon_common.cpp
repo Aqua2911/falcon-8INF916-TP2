@@ -14,10 +14,12 @@ int Falcon::ReceiveFrom(std::string& from, const std::span<char, 65535> message)
 
 void Falcon::ConnectTo(const std::string &ip, uint16_t port)
 {
+    // clients vector doesn't have data yet so we can't add message to message buffer
     SendTo(ip, port, "CONNECT|");
 
-    // TODO : start new thread listening for responses (Listen(port))
-    //  maybe add server to clients vector and then add connect message to messageToBeSent buffer ?
+    StartListening(port);
+
+    // TODO : if no CONNECTACK has been received for a certain amount of time, stop listening to prevent infinit loop ?
 }
 
 void Falcon::OnConnectionEvent(uint64_t newClientID)    // client API
@@ -37,9 +39,9 @@ void Falcon::OnConnectionEvent(uint64_t newClientID)    // client API
     clients.insert({serverID, newServer});
 }
 
-void Falcon::OnConnectionEvent(uint64_t clientID, std::function<void(bool, uint64_t)> handler) {
-    this->handler = [handler, clientID]() {handler(true, clientID);};
-}
+//void Falcon::OnConnectionEvent(uint64_t clientID, std::function<void(bool, uint64_t)> handler) {
+//    this->handler = [handler, clientID]() {handler(true, clientID);};
+//}
 
 void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    // server API
 {
@@ -52,7 +54,7 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
     else
     {
         newClientID = 1;
-        StartCleanUp();
+        //StartCleanUp();
     }
     auto* newClient = new ClientInfo;
     //newClient->clientID = newClientID;
@@ -66,8 +68,11 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
     message.append(std::to_string(newClientID));
 
     //Send an Acknowledgement to the Client
-    SendToInternal(from, clientPort, message);
+    //SendToInternal(from, clientPort, message);
+    std::vector<char> data(message.begin(), message.end());
+    AddMessageToSendBuffer(newClientID, std::move(data));
 
+    std::cout << "connectack added to buffer" <<  std::endl;
 }
 
 
@@ -81,8 +86,8 @@ void Falcon::OnClientDisconnected(uint64_t clientID)    // not sure if this work
     }
     delete it->second;
     std::cout << "Client Disconnected" << std::endl;
-    if (clients.empty())
-        StopCleanUp();
+    //if (clients.empty())
+    //    StopCleanUp();
 }
 
 void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
@@ -93,7 +98,7 @@ void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
         matchedClient->second->lastHeartbeat = std::chrono::steady_clock::now();
     }
 }
-
+/*
 void Falcon::StartCleanUp()
 {
     if (ClientID ==0) {
@@ -134,7 +139,7 @@ void Falcon::StopCleanUp()
         std::cout << "Thread Succesfully joined" << std::endl;
     }
 }
-
+*/
 long long Falcon::ElapsedTime(ClientInfo* c) {
     std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
     auto duration = now - c->lastHeartbeat;
@@ -222,7 +227,8 @@ void Falcon::NotifyNewStream(const Stream& stream)
     message.append("|");
     message.append(std::to_string((int) isStreamReliable));
 
-    AddMessageToSendBuffer(notificationRecipient, message);
+    std::vector<char> data(message.begin(), message.end());
+    AddMessageToSendBuffer(notificationRecipient, std::move(data));
 }
 
 void Falcon::OnNewStreamNotificationReceived(uint64_t senderID, bool isReliable)
@@ -249,26 +255,36 @@ std::vector<std::string> Falcon::ParseMessage(const std::span<char, 65535> messa
     return tokens;
 }
 
-void Falcon::AddMessageToSendBuffer(uint64_t receiverID, std::span<const char> message)
+void Falcon::AddMessageToSendBuffer(uint64_t receiverID, std::vector<char> message)
 {
-    messagesToBeSent.push_back( {receiverID, message} );
+    messagesToBeSent.emplace_back(receiverID, std::move(message) );
+
+    std::cout << "here" << std::endl;
 }
 
 void Falcon::Update()
 {
-    if (handler)
-    {
-        handler();  // TODO : find out how it works with the arguments and stuff, maybe one handler per event type ? ...
 
-        // reset handler
-        handler = nullptr;
-    }
+    //if (handler)
+    //{
+    //    handler();  // TODO : find out how it works with the arguments and stuff, maybe one handler per event type ? ...
+    //
+    //    // reset handler
+    //    handler = nullptr;
+    //}
     //if (connectionHandler)
     //{
     //    uint64_t clientID;
     //    connectionHandler(clientID); // FIXME : what do i put here ????
     //    connectionHandler = nullptr;
     //}
+
+    // decodes messages in receive queue
+    for (const auto &[from, message] : messagesReceived)
+    {
+        DecodeMessage(from, message);
+    }
+    messagesReceived.clear();   // clear buffer once all messages have been decoded
 
     for (const auto &[streamID, stream] : activeStreams)
     {
@@ -291,18 +307,46 @@ void Falcon::Update()
                 SendTo(matchedReceiver->second->ip, matchedReceiver->second->port, message);
             }
         }
+        std::cout << "messages sent" << std::endl;
         // delete messages from queue
         messagesToBeSent.clear();
     }
 }
 
-void Falcon::Listen(uint16_t port)  // TODO : make this run in a second thread
+void Falcon::UpdateLoop()
+{
+    while (running)
+    {
+        Update();
+    }
+}
+
+void Falcon::StartListening(uint16_t port)
+{
+    running = true;
+
+    updateThread = std::thread(&Falcon::UpdateLoop, this);
+    listenThread = std::thread([this, port]() { Listen(port); });
+}
+
+void Falcon::StopListening() {
+    running = false;
+
+    if (updateThread.joinable()) {
+        updateThread.join();
+    }
+    if (listenThread.joinable()) {
+        listenThread.join();
+    }
+}
+
+void Falcon::Listen(uint16_t port)
 {
     std::string from_ip;
     from_ip.resize(255);
     std::array<char, 65535> buffer;
 
-    while (true)
+    while (running)
     {
         int read_bytes = ReceiveFrom(from_ip, buffer);
 
@@ -316,7 +360,11 @@ void Falcon::Listen(uint16_t port)  // TODO : make this run in a second thread
 
             if (fromPortInt == port) // FIXME : not sure about this
             {
-                DecodeMessage(from_ip, buffer);
+                //DecodeMessage(from_ip, buffer);
+
+                // store message to be decoded later
+                std::vector<char> message(buffer.begin(), buffer.end());
+                messagesReceived.push_back( {from_ip, std::move(message)} );
             }
             // message is ignored if not on designated port
         }
@@ -329,10 +377,10 @@ void Falcon::Listen(uint16_t port)  // TODO : make this run in a second thread
     }
 }
 
-void Falcon::DecodeMessage(std::string from, std::span<char, 65535> message)
+void Falcon::DecodeMessage(const std::string& from, std::vector<char> message)
 {
-
-    auto splitMessage = ParseMessage(message, "|");
+    std::span<char, 65535> msg(message.data(), message.size());
+    auto splitMessage = ParseMessage(msg, "|");
     const std::string& messageType = splitMessage[0];
 
     //Test if it's a new client trying to connect
@@ -342,34 +390,22 @@ void Falcon::DecodeMessage(std::string from, std::span<char, 65535> message)
         const std::string fromIP = from.substr(0, pos); // substring up to the delimiter
         const std::string fromPort = from.substr(pos + 1);
 
-        //OnClientConnected(fromIP, stoi(fromPort));
-        OnClientConnected([](uint64_t clientID){
-            // create new client id here ? if so what is the argument passed to the handler ??
-            // TODO
-        });
+        std::cout << "connect message received" << std::endl;
+
+        OnClientConnected(fromIP, stoi(fromPort));
+        //OnClientConnected([](uint64_t clientID){
+        //    // handler lambda ...
+        //
+        //});
 
         //UpdateLastHeartbeat(GetSenderID(from));
+        std::cout << "here" << std::endl;
     }
 
     if (GetMessageType(messageType) == MessageType::CONNECTACK)    // splitMessage : CONNECTACK|clientID
     {
         const std::string& clientID = splitMessage[1];
-        //OnConnectionEvent(stoi(clientID));
-        OnConnectionEvent(stoi(clientID), [](bool success, uint64_t clientID){
-            ClientID = clientID;
-
-            // add server to "clients" map
-            if (!clients.empty())
-            {
-                clients.clear(); // empty clients map so it only has one server at a time
-            }
-            auto* newServer = new ClientInfo;
-            newServer->ip = "127.0.0.1";
-            newServer->port = 5555;
-            newServer->lastHeartbeat = std::chrono::steady_clock::now();
-            uint64_t serverID = 0;
-            clients.insert({serverID, newServer});
-        });
+        OnConnectionEvent(stoi(clientID));
     }
     if (GetMessageType(messageType) == MessageType::NEWSTREAM)  // splitMessage : NEWSTREAM|senderID|isReliable
     {
@@ -407,10 +443,10 @@ void Falcon::DecodeMessage(std::string from, std::span<char, 65535> message)
 }
 
 // TODO:
-//          - create while loop that calls Falcon::Update()
-//          - figure out how to handle connection
-//          - use handlers for event management
 //          - send notification that stream had been closed
+// DONE     - create while loop that calls Falcon::Update()
+// ??       - figure out how to handle connection (not sure what i meant when i wrote this todo...)
+// DONE-ish - use handlers for event management
 // DONE     - create while loop for reception of message
 // DONE     - figure how when to start loop
 // DONE     - make it so stream adds message to queue instead of calling sendto

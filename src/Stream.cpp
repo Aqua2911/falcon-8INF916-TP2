@@ -37,7 +37,9 @@ void Stream::SendData(std::span<const char> Data)
     streamData.append(dataSTR);
 
     // add data to buffer to be sent by falcon
-    dataToBeSent.push_back(streamData);
+    std::vector<char> strdata(streamData.begin(), streamData.end());
+    dataToBeSent.push_back(std::move(strdata));
+    hasDataToBeSent = !dataToBeSent.empty();
 }
 
 void Stream::OnDataReceived(uint32_t messageID, std::span<const char> Data)
@@ -63,7 +65,9 @@ void Stream::SendAck(uint32_t messageID)
     ack.append("|");
 
     // add message to data buffer
-    dataToBeSent.push_back(ack);
+    std::vector<char> ackmsg(ack.begin(), ack.end());
+    dataToBeSent.push_back(std::move(ackmsg));
+    hasDataToBeSent = !dataToBeSent.empty();
 }
 
 void Stream::OnAckReceived(uint32_t lastMessageReceivedID)
@@ -101,7 +105,9 @@ void Stream::CheckNotYetAcknowledged()
     for (auto msgID: notYetAcknowledged)
     {
         auto msg = messageMap.find(msgID);
-        dataToBeSent.push_back(msg->second);
+        std::vector<char> message(msg->second.begin(), msg->second.end());
+        dataToBeSent.push_back(std::move(message));
+        hasDataToBeSent = !dataToBeSent.empty();
     }
 }
 
@@ -113,7 +119,7 @@ void Stream::NotYetAcknowledgedLoop() {
     }
 }
 
-void Stream::WriteDataToBuffer(std::vector<std::pair<uint64_t, std::span<const char>>> &buffer)
+void Stream::WriteDataToBuffer(std::vector<std::pair<uint64_t, std::vector<char>>> &buffer)
 {
     for (const auto &data : dataToBeSent)
     {
