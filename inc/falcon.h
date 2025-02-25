@@ -39,13 +39,11 @@ public:
     void OnClientConnected(const std::string &from, uint16_t clientPort);
 
     void Listen(uint16_t port);
-    //void OnClientConnected(std::function<void(uint64_t)> handler);
 
     //Client
     static std::unique_ptr<Falcon> Connect(const std::string& serverIp, uint16_t port);
     void ConnectTo(const std::string& ip, uint16_t port);
     void OnConnectionEvent(uint64_t newClientID); //Here the bool represent the success of the connection
-    //void OnConnectionEvent(uint64_t clientID, std::function<void(bool, uint64_t)> handler); //Here the bool represent the success of the connection
 
     void StartListening(uint16_t port);
     void StopListening();
@@ -55,8 +53,6 @@ public:
     void StartCleanUp();
     void StopCleanUp();
 
-    //void OnClientDisconnected(ClientInfo* c); //Server API
-    //void OnDisconnect(std::function<void> handler);  //Client API
     void DisconnectToServer();  // client API
     void OnClientDisconnected(uint64_t clientID); //Server API
     void OnDisconnect();    // client API
@@ -115,12 +111,8 @@ private:
     std::unordered_map<uint32_t, std::shared_ptr<Stream>> activeStreams;    // <streamID, Stream>
     uint32_t nextStreamID = 1;
 
-    //std::function<void()> handler;
-    //std::function<void(uint64_t)> clientConnectedHandler;
-    //std::function<void(bool, uint64_t)> connectionHandler;
     std::vector<std::pair<uint64_t, std::vector<char>>> messagesToBeSent;    // <receiverID, message> pairs
     std::vector<std::pair<std::string, std::vector<char>>> messagesReceived;   // <from, message> pairs
-    // FIXME : not sure about using std::vector but this prevents the memory being deleted while it's being used (which happens with spans)
 
     void Update();
     void UpdateLoop();

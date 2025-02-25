@@ -19,7 +19,7 @@ void Falcon::ConnectTo(const std::string &ip, uint16_t port)
 
     StartListening(port);
 
-    // TODO : if no CONNECTACK has been received for a certain amount of time, stop listening to prevent infinit loop ?
+    // TODO : if no CONNECTACK has been received for a certain amount of time, stop listening to prevent infinite loop ?
 }
 
 void Falcon::OnConnectionEvent(uint64_t newClientID)    // client API
@@ -283,22 +283,7 @@ void Falcon::AddMessageToSendBuffer(uint64_t receiverID, std::vector<char> messa
 
 void Falcon::Update()
 {
-
-    //if (handler)
-    //{
-    //    handler();  // TODO : find out how it works with the arguments and stuff, maybe one handler per event type ? ...
-    //
-    //    // reset handler
-    //    handler = nullptr;
-    //}
-    //if (connectionHandler)
-    //{
-    //    uint64_t clientID;
-    //    connectionHandler(clientID); // FIXME : what do i put here ????
-    //    connectionHandler = nullptr;
-    //}
-
-    // decodes messages in receive queue
+    // decode messages in receive queue
     for (const auto &[from, message] : messagesReceived)
     {
         DecodeMessage(from, message);
@@ -378,7 +363,7 @@ void Falcon::Listen(uint16_t port)
             const std::string fromPort = from_ip.substr(pos + 1);
             uint16_t fromPortInt = atoi(fromPort.c_str());
 
-            if (fromPortInt == port) // FIXME : not sure about this
+            if (fromPortInt == port)
             {
                 //DecodeMessage(from_ip, buffer);
 
