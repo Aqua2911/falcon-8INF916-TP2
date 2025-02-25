@@ -43,6 +43,21 @@ void Falcon::OnConnectionEvent(uint64_t newClientID)    // client API
 //    this->handler = [handler, clientID]() {handler(true, clientID);};
 //}
 
+void Falcon::DisconnectToServer()
+{
+    const uint16_t serverID = 0;
+    std::string message = "DISCONNECT|";
+    message.append(std::to_string(ClientID));
+
+    std::vector<char> data(message.begin(), message.end());
+    AddMessageToSendBuffer(serverID, std::move(data));
+}
+
+void Falcon::OnDisconnect()
+{
+    //StopListening();
+}
+
 void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    // server API
 {
     uint64_t newClientID;
@@ -71,8 +86,6 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
     //SendToInternal(from, clientPort, message);
     std::vector<char> data(message.begin(), message.end());
     AddMessageToSendBuffer(newClientID, std::move(data));
-
-    std::cout << "connectack added to buffer" <<  std::endl;
 }
 
 
@@ -80,14 +93,22 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
 
 void Falcon::OnClientDisconnected(uint64_t clientID)    // not sure if this works i just took the previous version and changed some stuff
 {
+    std::string clientIP;
+    uint16_t clientPort;
     auto it = clients.find(clientID);
     if (it != clients.end()) {
+        clientIP = it->second->ip;
+        clientPort = it->second->port;
         clients.erase(it);
+
+        // client is no longer part of clients list so we need to manually send the DC ACK message
+        SendTo(clientIP, clientPort,"DISCONNECTACK|");
     }
-    delete it->second;
+    //delete it->second;
     std::cout << "Client Disconnected" << std::endl;
     //if (clients.empty())
     //    StopCleanUp();
+
 }
 
 void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
@@ -258,8 +279,6 @@ std::vector<std::string> Falcon::ParseMessage(const std::span<char, 65535> messa
 void Falcon::AddMessageToSendBuffer(uint64_t receiverID, std::vector<char> message)
 {
     messagesToBeSent.emplace_back(receiverID, std::move(message) );
-
-    std::cout << "here" << std::endl;
 }
 
 void Falcon::Update()
@@ -307,7 +326,6 @@ void Falcon::Update()
                 SendTo(matchedReceiver->second->ip, matchedReceiver->second->port, message);
             }
         }
-        std::cout << "messages sent" << std::endl;
         // delete messages from queue
         messagesToBeSent.clear();
     }
@@ -332,10 +350,10 @@ void Falcon::StartListening(uint16_t port)
 void Falcon::StopListening() {
     running = false;
 
-    if (updateThread.joinable()) {
+    if (updateThread.joinable() && updateThread.get_id() != std::this_thread::get_id()) {
         updateThread.join();
     }
-    if (listenThread.joinable()) {
+    if (listenThread.joinable() && listenThread.get_id() != std::this_thread::get_id()) {
         listenThread.join();
     }
 }
@@ -348,6 +366,8 @@ void Falcon::Listen(uint16_t port)
 
     while (running)
     {
+        //std::memset(buffer.data(), 0, buffer.size());
+
         int read_bytes = ReceiveFrom(from_ip, buffer);
 
         if (read_bytes > 0)
@@ -390,8 +410,6 @@ void Falcon::DecodeMessage(const std::string& from, std::vector<char> message)
         const std::string fromIP = from.substr(0, pos); // substring up to the delimiter
         const std::string fromPort = from.substr(pos + 1);
 
-        std::cout << "connect message received" << std::endl;
-
         OnClientConnected(fromIP, stoi(fromPort));
         //OnClientConnected([](uint64_t clientID){
         //    // handler lambda ...
@@ -399,7 +417,6 @@ void Falcon::DecodeMessage(const std::string& from, std::vector<char> message)
         //});
 
         //UpdateLastHeartbeat(GetSenderID(from));
-        std::cout << "here" << std::endl;
     }
 
     if (GetMessageType(messageType) == MessageType::CONNECTACK)    // splitMessage : CONNECTACK|clientID
@@ -438,6 +455,15 @@ void Falcon::DecodeMessage(const std::string& from, std::vector<char> message)
         {
             mappedStream->second->OnDataReceived(messageID, data);
         }
+    }
+    if (messageType == "DISCONNECT")
+    {
+        const uint64_t senderID = std::stoi(splitMessage[1]);
+        OnClientDisconnected(senderID);
+    }
+    if (messageType == "DISCONNECTACK")
+    {
+        OnDisconnect();
     }
     // TODO: if (CLOSESTREAM) : delete stream locally and send CLOSESTREAMACK
 }

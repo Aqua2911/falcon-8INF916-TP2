@@ -55,10 +55,11 @@ public:
     void StartCleanUp();
     void StopCleanUp();
 
-    void OnClientDisconnected(ClientInfo* c); //Server API
-    void OnDisconnect(std::function<void> handler);  //Client API
-
+    //void OnClientDisconnected(ClientInfo* c); //Server API
+    //void OnDisconnect(std::function<void> handler);  //Client API
+    void DisconnectToServer();  // client API
     void OnClientDisconnected(uint64_t clientID); //Server API
+    void OnDisconnect();    // client API
 
     std::shared_ptr<Stream> CreateStream(uint64_t client, bool reliable); //Server API
     std::shared_ptr<Stream> CreateStream(bool reliable); //Client API
