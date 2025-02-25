@@ -11,15 +11,17 @@
 
 Stream::Stream(uint64_t senderID, uint64_t receiverID, uint32_t id, bool reliable) : senderID(senderID),receiverID(receiverID), streamID(id), isReliable(reliable) {
     lastMessageSentID = 0;
+    hasDataToBeSent = false;
 }
 
 void Stream::SendData(std::span<const char> Data)
 {
     lastMessageSentID++;
     if(isReliable) {
-        std::string dataSTR(Data.data(), Data.size());
+        std::vector<char> dataVEC(Data.begin(), Data.end());
+        //std::string dataSTR(Data.data(), Data.size());
         //pendingResends.push_back(std::span<const char>(Data.begin(), Data.end()));
-        messageMap.insert({lastMessageSentID, dataSTR});
+        messageMap.insert({lastMessageSentID, dataVEC});
         notYetAcknowledged.push_back(lastMessageSentID);
         StartNotYetAcknowledgedLoop();
     }
@@ -44,8 +46,9 @@ void Stream::SendData(std::span<const char> Data)
 
 void Stream::OnDataReceived(uint32_t messageID, std::span<const char> Data)
 {
-    std::string dataSTR(Data.data(), Data.size());
-    messageMap.insert({messageID, dataSTR});   // receiver stores data for future processing
+    std::vector<char> dataVEC(Data.begin(), Data.end());
+    //std::string dataSTR(Data.data(), Data.size());
+    messageMap.insert({messageID, dataVEC});   // receiver stores data for future processing
 
     if (isReliable) {
         SendAck(messageID);

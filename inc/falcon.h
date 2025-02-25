@@ -75,6 +75,7 @@ public:
 
     static MessageType GetMessageType(const std::string& messageType);
     static std::vector<std::string> ParseMessage(const std::span<char, 65535> message, const std::string& delimiter);
+    void FindStreamMessage(uint32_t streamID, uint32_t messageID, std::vector<char> &messageBuffer);    // used for tests
 
     // <clientID, clientInfo>
     std::map<uint64_t, ClientInfo*> clients;

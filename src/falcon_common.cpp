@@ -276,6 +276,20 @@ std::vector<std::string> Falcon::ParseMessage(const std::span<char, 65535> messa
     return tokens;
 }
 
+void Falcon::FindStreamMessage(uint32_t streamID, uint32_t messageID, std::vector<char> &messageBuffer)
+{
+    auto it = activeStreams.find(streamID);
+    if (it == activeStreams.end()) {
+        return;
+    }
+    auto msgIT = it->second->messageMap.find(messageID);
+    if (msgIT == it->second->messageMap.end()){
+        return;
+    }
+
+    messageBuffer = std::move(msgIT->second);
+}
+
 void Falcon::AddMessageToSendBuffer(uint64_t receiverID, std::vector<char> message)
 {
     messagesToBeSent.emplace_back(receiverID, std::move(message) );

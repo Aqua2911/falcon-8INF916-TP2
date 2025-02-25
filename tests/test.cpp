@@ -188,3 +188,40 @@ TEST_CASE("Can Listen for messages on other thread", "[falcon]") {
     server->StopListening();
     REQUIRE(client->ClientID == 1);
 }
+
+TEST_CASE("Can Create stream and send data multi-threaded", "[falcon]") {
+    auto client = Falcon::Connect("127.0.0.1", 5556);
+    auto server = Falcon::Listen("127.0.0.1", 5555);
+
+    REQUIRE(client != nullptr);
+    REQUIRE(server != nullptr);
+
+    server->StartListening(5556);
+
+    client->ConnectTo("127.0.0.1", 5555);
+
+    //client->DisconnectToServer();
+    while (client->ClientID != 1)
+    {
+        // stall this thread while others process messages
+    }
+
+    auto stream = server->CreateStream(client->ClientID, false);
+    server->NotifyNewStream(*stream);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    char rawData[1] = { 0x42 };
+    std::span<const char> data(rawData);
+    stream->SendData(data);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    //REQUIRE(client->ClientID == 1);
+    client->StopListening();
+    server->StopListening();
+    REQUIRE(client->ClientID == 1);
+    std::vector<char> messageBuffer;
+    client->FindStreamMessage(1, 1, messageBuffer);
+    REQUIRE(messageBuffer[0] == rawData[0]);    // message has succefully been received and stored for processing by client
+}

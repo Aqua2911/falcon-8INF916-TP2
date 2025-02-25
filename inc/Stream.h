@@ -24,7 +24,7 @@ public:
     bool HasDataToBeSent() const;
     uint64_t GetReceiverID() const;
 
-    std::map<uint32_t, std::string> messageMap;    // <messageID, message>
+    std::map<uint32_t, std::vector<char>> messageMap;    // <messageID, message>
     //std::map<uint32_t, std::span<const char>> receiveBuffer;
     std::vector<uint32_t> notYetAcknowledged;
 
