@@ -158,6 +158,9 @@ TEST_CASE("Can Listen for messages on other thread", "[falcon]") {
     auto client = Falcon::Connect("127.0.0.1", 5556);
     auto server = Falcon::Listen("127.0.0.1", 5555);
 
+    REQUIRE(client != nullptr);
+    REQUIRE(server != nullptr);
+
     server->StartListening(5556);
 
 
@@ -168,16 +171,20 @@ TEST_CASE("Can Listen for messages on other thread", "[falcon]") {
     //std::span data(message.data(), message.size());
 
     // wait a bit for everything to be processed in other threads before ending test
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    //std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    //server->StopListening();
-    //client->StopListening();
+
     std::cout << "Test finished.\n";
 
-    //REQUIRE(byte_received == message.size());
-    //REQUIRE(std::equal(buffer.begin(),
-    //                   buffer.begin() + byte_received,
-    //                   message.begin(),
-    //                   message.end()));
-    //REQUIRE(from_ip == "127.0.0.1:5556");
+    //client->DisconnectToServer();
+    //while (client->ClientID != 1)
+    //{
+    //    // stall this thread while others process messages
+    //}
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    //REQUIRE(client->ClientID == 1);
+    client->StopListening();
+    server->StopListening();
+    REQUIRE(client->ClientID == 1);
 }
