@@ -66,7 +66,7 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
     else
     {
         newClientID = 1;
-        //StartCleanUp();
+        StartCleanUp();
     }
     auto* newClient = new ClientInfo;
     //newClient->clientID = newClientID;
@@ -139,7 +139,7 @@ void Falcon::CleanConnections()
 {
     for (auto c: clients)
     {
-        if (ElapsedTime(c.second) > 1)
+        if (ElapsedTime(c.second) > 5)
             OnClientDisconnected(c.first);
     }
 }
