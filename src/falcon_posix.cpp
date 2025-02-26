@@ -3,6 +3,8 @@
 #include <netdb.h>
 #include <unistd.h>
 
+#include <fcntl.h>
+
 #include <memory>
 #include <fmt/core.h>
 #include "falcon.h"
