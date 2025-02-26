@@ -358,7 +358,7 @@ void Falcon::Listen(uint16_t port)
 {
     std::string from_ip;
     from_ip.resize(255);
-    std::array<char, 65535> buffer;
+    std::array<char, 65535> buffer{};
 
     while (running)
     {
@@ -444,7 +444,7 @@ void Falcon::DecodeMessage(const std::string& from, std::vector<char> message)
         const uint64_t senderID = std::stoi(splitMessage[1]);
         const uint32_t streamID = std::stoi(splitMessage[2]);
         const uint32_t messageID = std::stoi(splitMessage[3]);
-        const std::string data = splitMessage[4];
+        const std::string& data = splitMessage[4];
 
         auto mappedStream = activeStreams.find(streamID);
         if (mappedStream != activeStreams.end())    // failsafe

@@ -65,16 +65,16 @@ public:
 
     Falcon();
     ~Falcon();
-    Falcon(const Falcon&) = default;
-    Falcon& operator=(const Falcon&) = default;
-    Falcon(Falcon&&) = default;
-    Falcon& operator=(Falcon&&) = default;
+    Falcon(const Falcon&) = delete;
+    Falcon& operator=(const Falcon&) = delete;
+    Falcon(Falcon&&) = delete;
+    Falcon& operator=(Falcon&&) = delete;
 
     int SendTo(const std::string& to, uint16_t port, std::span<const char> message);
     int ReceiveFrom(std::string& from, std::span<char, 65535> message);
 
     static MessageType GetMessageType(const std::string& messageType);
-    static std::vector<std::string> ParseMessage(const std::span<char, 65535> message, const std::string& delimiter);
+    static std::vector<std::string> ParseMessage(std::span<char, 65535> message, const std::string& delimiter);
     void FindStreamMessage(uint32_t streamID, uint32_t messageID, std::vector<char> &messageBuffer);    // used for tests
 
     // <clientID, clientInfo>
@@ -86,7 +86,7 @@ private:
     int SendToInternal(const std::string& to, uint16_t port, std::span<const char> message);
     int ReceiveFromInternal(std::string& from, std::span<char, 65535> message);
 
-    void UpdateLastHeartbeat(const uint64_t ClientID);
+    void UpdateLastHeartbeat(uint64_t ClientID);
     void CleanConnections();
 
 

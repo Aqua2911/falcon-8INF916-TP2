@@ -41,7 +41,7 @@ TEST_CASE("Can Receive From", "[falcon]") {
     REQUIRE(bytes_sent == message.size());
     std::string from_ip;
     from_ip.resize(255);
-    std::array<char, 65535> buffer;
+    std::array<char, 65535> buffer{};
     int byte_received = receiver->ReceiveFrom(from_ip, buffer);
 
     REQUIRE(byte_received == message.size());
@@ -59,7 +59,7 @@ TEST_CASE("Can Connect To", "[falcon]") {
 
     std::string from_ip;
     from_ip.resize(255);
-    std::array<char, 65535> buffer;
+    std::array<char, 65535> buffer{};
     int byte_received_server = receiver->ReceiveFrom(from_ip, buffer);
 
     int byte_received_client = sender->ReceiveFrom(from_ip, buffer);
@@ -74,7 +74,7 @@ TEST_CASE("Can Notify Disconnection", "[falcon]") {
 
     std::string from_ip;
     from_ip.resize(255);
-    std::array<char, 65535> buffer;
+    std::array<char, 65535> buffer{};
     receiver->ReceiveFrom(from_ip, buffer);
 
     REQUIRE(!receiver->clients.empty());
@@ -91,7 +91,7 @@ TEST_CASE("Stream can send and receive Ack", "[stream]") {
 
     std::string from_ip;
     from_ip.resize(255);
-    std::array<char, 65535> buffer;
+    std::array<char, 65535> buffer{};
 
     //Receive the client connection
     server->ReceiveFrom(from_ip, buffer);
@@ -119,7 +119,7 @@ TEST_CASE("Stream can send and receive data", "[stream]") {
 
     std::string from_ip;
     from_ip.resize(255);
-    std::array<char, 65535> buffer;
+    std::array<char, 65535> buffer{};
 
     //Receive the client connection
     server->ReceiveFrom(from_ip, buffer);
