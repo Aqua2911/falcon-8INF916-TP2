@@ -39,9 +39,6 @@ void Falcon::OnConnectionEvent(uint64_t newClientID)    // client API
     clients.insert({serverID, newServer});
 }
 
-//void Falcon::OnConnectionEvent(uint64_t clientID, std::function<void(bool, uint64_t)> handler) {
-//    this->handler = [handler, clientID]() {handler(true, clientID);};
-//}
 
 void Falcon::DisconnectToServer()
 {
@@ -55,7 +52,7 @@ void Falcon::DisconnectToServer()
 
 void Falcon::OnDisconnect()
 {
-    //StopListening();
+    StopListening();
 }
 
 void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    // server API
@@ -104,10 +101,10 @@ void Falcon::OnClientDisconnected(uint64_t clientID)    // not sure if this work
         // client is no longer part of clients list so we need to manually send the DC ACK message
         SendTo(clientIP, clientPort,"DISCONNECTACK|");
     }
-    //delete it->second;
+    delete it->second;
     std::cout << "Client Disconnected" << std::endl;
-    //if (clients.empty())
-    //    StopCleanUp();
+    if (clients.empty())
+        StopCleanUp();
 
 }
 
@@ -119,7 +116,7 @@ void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
         matchedClient->second->lastHeartbeat = std::chrono::steady_clock::now();
     }
 }
-/*
+
 void Falcon::StartCleanUp()
 {
     if (ClientID ==0) {
@@ -160,7 +157,7 @@ void Falcon::StopCleanUp()
         std::cout << "Thread Succesfully joined" << std::endl;
     }
 }
-*/
+
 long long Falcon::ElapsedTime(ClientInfo* c) {
     std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
     auto duration = now - c->lastHeartbeat;
