@@ -8,6 +8,7 @@
 #include <thread>
 //#include <_bsd_types.h>
 #include <map>
+#include <array>
 
 #include "ClientInfo.h"
 #include "Stream.h"

@@ -3,10 +3,7 @@
 //
 #include "Stream.h"
 
-#include <winsock2.h>
-
 #include "falcon.h"
-#include "fmt/format.h"
 
 
 Stream::Stream(uint64_t senderID, uint64_t receiverID, uint32_t id, bool reliable) : senderID(senderID),receiverID(receiverID), streamID(id), isReliable(reliable) {
