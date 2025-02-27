@@ -23,20 +23,32 @@ void Stream::SendData(std::span<const char> Data)
         StartNotYetAcknowledgedLoop();
     }
 
-    std::string streamData = "STREAMDATA";
-    streamData.append("|");
-    streamData.append(std::to_string(senderID));
-    streamData.append("|");
-    streamData.append(std::to_string(streamID));
-    streamData.append("|");
-    streamData.append(std::to_string(lastMessageSentID));
-    streamData.append("|");
-    // Convert to string
-    std::string dataSTR(Data.data(), Data.size());
-    streamData.append(dataSTR);
+    //std::string streamData = "STREAMDATA";
+    //streamData.append("|");
+    //streamData.append(std::to_string(senderID));
+    //streamData.append("|");
+    //streamData.append(std::to_string(streamID));
+    //streamData.append("|");
+    //streamData.append(std::to_string(lastMessageSentID));
+    //streamData.append("|");
+    //// Convert to string
+    //std::string dataSTR(Data.data(), Data.size());
+    //streamData.append(dataSTR);
+
+    uint8_t type = 0x04;
+    const size_t bufferSize = sizeof(type) + sizeof(senderID) + sizeof(streamID) + sizeof(lastMessageSentID) + Data.size();
+    std::vector<char> strdata(bufferSize);
+
+    memcpy(strdata.data(), &type, sizeof(type));
+    memcpy(strdata.data() + sizeof(type), &senderID, sizeof(senderID));
+    memcpy(strdata.data() + sizeof(type) + sizeof(senderID), &streamID, sizeof(streamID));
+    memcpy(strdata.data() + sizeof(type) + sizeof(senderID) + sizeof(streamID), &lastMessageSentID, sizeof(lastMessageSentID));
+
+    memcpy(strdata.data() + sizeof(type) + sizeof(senderID) + sizeof(streamID) + sizeof(lastMessageSentID), Data.data(), Data.size());
+
 
     // add data to buffer to be sent by falcon
-    std::vector<char> strdata(streamData.begin(), streamData.end());
+    //std::vector<char> strdata(streamData.begin(), streamData.end());
     dataToBeSent.push_back(std::move(strdata));
     hasDataToBeSent = !dataToBeSent.empty();
 }
@@ -54,19 +66,27 @@ void Stream::OnDataReceived(uint32_t messageID, std::span<const char> Data)
 
 void Stream::SendAck(uint32_t messageID)
 {
-    std::string ack = "STREAMACK";
-    ack.append("|");
-    ack.append(std::to_string(senderID));
-    ack.append("|");
-    ack.append(std::to_string(streamID));
-    ack.append("|");
+    //std::string ack = "STREAMACK";
+    //ack.append("|");
+    //ack.append(std::to_string(senderID));
+    //ack.append("|");
+    //ack.append(std::to_string(streamID));
+    //ack.append("|");
 
-    ack.append(std::to_string(messageID));
-    ack.append("|");
+    //ack.append(std::to_string(messageID));
+    //ack.append("|");
+
+    uint8_t type = 0x03;    // STEAMACK
+    const size_t bufferSize = sizeof(type) + sizeof(senderID) + sizeof(streamID) + sizeof(messageID);
+    std::vector<char> ackmsg(bufferSize);
+    memcpy(ackmsg.data(), &type, sizeof(type));
+    memcpy(ackmsg.data() + sizeof(type), &senderID, sizeof(senderID));
+    memcpy(ackmsg.data() + sizeof(type) + sizeof(senderID), &streamID, sizeof(streamID));
+    memcpy(ackmsg.data() + sizeof(type) + sizeof(senderID) + sizeof(streamID), &messageID, sizeof(messageID));
 
     // add message to data buffer
-    std::vector<char> ackmsg(ack.begin(), ack.end());
-    dataToBeSent.push_back(std::move(ackmsg));
+    //std::vector<char> ackmsg(ack.begin(), ack.end());
+    dataToBeSent.push_back(std::move(ackmsg));  // ackmsg : STREAMACK | senderID | streamID | messageID;
     hasDataToBeSent = !dataToBeSent.empty();
 }
 

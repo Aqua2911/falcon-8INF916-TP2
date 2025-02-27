@@ -16,7 +16,7 @@ void Falcon::ConnectTo(const std::string &ip, uint16_t port)
 {
     // clients vector doesn't have data yet so we can't add message to message buffer
     char buffer[1] = {};
-    uint8_t type = 0x01;
+    uint8_t type = 0x00;
     memcpy(buffer, &type, sizeof(uint8_t));
     std::span<char, 1> message(buffer);
 
@@ -49,12 +49,18 @@ void Falcon::OnConnectionEvent(uint64_t newClientID)    // client API
 
 void Falcon::DisconnectToServer()
 {
+    const uint8_t type = 0x05;
     const uint16_t serverID = 0;
-    std::string message = "DISCONNECT|";
-    message.append(std::to_string(ClientID));
+    const size_t bufferSize = sizeof(type) + sizeof(serverID);
+    std::vector<char> message(bufferSize);
 
-    std::vector<char> data(message.begin(), message.end());
-    AddMessageToSendBuffer(serverID, std::move(data));
+    memcpy(message.data(), &type, sizeof(type));
+    memcpy(message.data() + sizeof(type), &serverID, sizeof(serverID));
+    //std::string message = "DISCONNECT|";
+    //message.append(std::to_string(ClientID));
+
+    //std::vector<char> data(message.begin(), message.end());
+    AddMessageToSendBuffer(serverID, std::move(message));
 }
 
 void Falcon::OnDisconnect()
@@ -83,13 +89,20 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
     //clients.push_back(newClient);
     clients.insert({newClientID, newClient});
 
-    std::string message = "CONNECTACK|";
-    message.append(std::to_string(newClientID));
+    //std::string message = "CONNECTACK|";
+    //message.append(std::to_string(newClientID));
+
+    uint8_t type = 0x01;
+    const size_t bufferSize = sizeof(type) + sizeof(newClientID);
+    std::vector<char> message(bufferSize);
+    //char buffer[sizeof(type) + sizeof(newClientID)] = {};
+    memcpy(message.data(), &type, sizeof(type));
+    memcpy(message.data() + sizeof(type), &newClientID, sizeof(newClientID));
 
     //Send an Acknowledgement to the Client
     //SendToInternal(from, clientPort, message);
-    std::vector<char> data(message.begin(), message.end());
-    AddMessageToSendBuffer(newClientID, std::move(data));
+    //std::vector<char> data(buffer, sizeof(buffer));
+    AddMessageToSendBuffer(newClientID, std::move(message));
 }
 
 
@@ -108,7 +121,11 @@ void Falcon::OnClientDisconnected(uint64_t clientID)    // not sure if this work
         clients.erase(it);
 
         // client is no longer part of clients list so we need to manually send the DC ACK message
-        SendTo(clientIP, clientPort,"DISCONNECTACK|");
+        char buffer[1] = {};
+        uint8_t type = 0x06;    // DISCONNECTACK
+        memcpy(buffer, &type, sizeof(uint8_t));
+        std::span<char, 1> message(buffer);
+        SendTo(clientIP, clientPort,message);
     }
     std::cout << "Client Disconnected" << std::endl;
     //if (clients.empty())
@@ -264,14 +281,23 @@ void Falcon::NotifyNewStream(const Stream& stream)
 
     // get notification recipient info
     uint64_t notificationRecipient = stream.GetReceiverID();
-    bool isStreamReliable = stream.IsReliable();
 
-    std::string message = "NEWSTREAM|";
-    message.append(std::to_string(ClientID));
-    message.append("|");
-    message.append(std::to_string((int) isStreamReliable));
+    //std::string message = "NEWSTREAM|";
+    //message.append(std::to_string(ClientID));
+    //message.append("|");
+    //message.append(std::to_string((int) isStreamReliable));
 
-    std::vector<char> data(message.begin(), message.end());
+    uint8_t type = 0x02;
+    uint8_t streamInfo = 0x00;
+    streamInfo = stream.IsReliable()?
+                 (streamInfo | 0x80):   // set first bit to 1
+                 (streamInfo & ~0x80);  // set first bit to 0
+    const size_t bufferSize = sizeof(type) + sizeof(ClientID) + sizeof(streamInfo);
+    std::vector<char> data(bufferSize);
+
+    memcpy(data.data(), &type, sizeof(type));
+    memcpy(data.data() + sizeof(type), &ClientID, sizeof(ClientID));
+    memcpy(data.data() + sizeof(type) + sizeof(ClientID), &streamInfo, sizeof(streamInfo));
     AddMessageToSendBuffer(notificationRecipient, std::move(data));
 }
 
@@ -426,42 +452,53 @@ void Falcon::Listen(uint16_t port)
 
 void Falcon::DecodeMessage(const std::string& from, std::vector<char> message)
 {
-    std::span<char, 65535> msg(message.data(), message.size());
-    auto splitMessage = ParseMessage(msg, "|");
-    const std::string& messageType = splitMessage[0];
+    //std::span<char, 65535> msg(message.data(), message.size());
+    //auto splitMessage = ParseMessage(msg, "|");
+    //const std::string& messageType = splitMessage[0];
+
+    uint8_t messageType = *(message.data()); // pointer to begining of data
 
     //Test if it's a new client trying to connect
-    if (GetMessageType(messageType) == MessageType::CONNECT) // splitMessage : CONNECT|
+    if (messageType == (uint8_t) 0x00) // CONNECT
     {
         size_t pos = from.find(':'); // Find the position of the character
         const std::string fromIP = from.substr(0, pos); // substring up to the delimiter
         const std::string fromPort = from.substr(pos + 1);
 
         OnClientConnected(fromIP, stoi(fromPort));
-        //OnClientConnected([](uint64_t clientID){
-        //    // handler lambda ...
-        //
-        //});
 
         //UpdateLastHeartbeat(GetSenderID(from));
     }
 
-    if (GetMessageType(messageType) == MessageType::CONNECTACK)    // splitMessage : CONNECTACK|clientID
+    if (messageType == (uint8_t) 0x01)    // splitMessage : CONNECTACK|clientID
     {
-        const std::string& clientID = splitMessage[1];
-        OnConnectionEvent(stoi(clientID));
+        uint64_t clientID;
+        memcpy(&clientID, message.data() + 1, sizeof(uint64_t));
+        OnConnectionEvent(clientID);
     }
-    if (GetMessageType(messageType) == MessageType::NEWSTREAM)  // splitMessage : NEWSTREAM|senderID|isReliable
+    if (messageType == (uint8_t) 0x02)  // splitMessage : NEWSTREAM|senderID|isReliable
     {
-        const uint64_t senderID = std::stoi(splitMessage[1]);
-        const bool isReliable = stoi(splitMessage[2]);
+        uint64_t senderID;
+        uint8_t reliability;
+        memcpy(&senderID, message.data() + 1, sizeof(senderID));
+        memcpy(&reliability, message.data() + sizeof(senderID), sizeof(reliability));
+
+        const bool isReliable = (reliability & 0x80) == 0x80;   // 0x80 : 1000 0000
+
         OnNewStreamNotificationReceived(senderID, isReliable);
     }
-    if (GetMessageType(messageType) == MessageType::STREAMACK)  // splitMessage : STREAMACK|senderID|streamID|lastMessageReceivedID
+    if (messageType == (uint8_t) 0x03)  // splitMessage : STREAMACK|senderID|streamID|lastMessageReceivedID
     {
         //const uint64_t senderID = std::stoi(splitMessage[1]);
-        const uint32_t streamID = std::stoi(splitMessage[2]);
-        const uint32_t lastMessageReceivedID = std::stoi(splitMessage[3]);
+        uint64_t senderID;
+        uint32_t streamID;
+        uint32_t lastMessageReceivedID;
+        memcpy(&senderID, message.data() + 1, sizeof(senderID));
+        memcpy(&streamID, message.data() + 1 + sizeof(senderID), sizeof(streamID));
+        memcpy(&lastMessageReceivedID, message.data() + 1 + sizeof(senderID) + sizeof(streamID), sizeof(lastMessageReceivedID));
+
+        //const uint32_t streamID = std::stoi(splitMessage[2]);
+        //const uint32_t lastMessageReceivedID = std::stoi(splitMessage[3]);
 
         auto mappedStream = activeStreams.find(streamID);
         if (mappedStream != activeStreams.end())    // failsafe
@@ -470,12 +507,24 @@ void Falcon::DecodeMessage(const std::string& from, std::vector<char> message)
         }
         // else no stream with matching streamID found
     }
-    if (GetMessageType(messageType) == MessageType::STREAMDATA) // splitMessage : STREAMDATA|senderID|streamID|messageID|data
+    if (messageType == (uint8_t) 0x04) // splitMessage : STREAMDATA|senderID|streamID|messageID|data
     {
-        const uint64_t senderID = std::stoi(splitMessage[1]);
-        const uint32_t streamID = std::stoi(splitMessage[2]);
-        const uint32_t messageID = std::stoi(splitMessage[3]);
-        const std::string& data = splitMessage[4];
+        uint64_t senderID;
+        uint32_t streamID;
+        uint32_t messageID;
+        memcpy(&senderID, message.data() + 1, sizeof(senderID));
+        memcpy(&streamID, message.data() + 1 + sizeof(senderID), sizeof(streamID));
+        memcpy(&messageID, message.data() + 1 + sizeof(senderID) + sizeof(streamID), sizeof(messageID));
+
+        const size_t datasize = sizeof(message) - sizeof(messageType) - sizeof(senderID) - sizeof(streamID) - sizeof(messageID);
+        char databuffer[datasize] = {};
+        memcpy(databuffer, message.data() + sizeof(messageType) + sizeof(senderID) + sizeof(streamID) + sizeof(messageID), datasize);
+        std::span<char, datasize> data(databuffer);
+
+        //const uint64_t senderID = std::stoi(splitMessage[1]);
+        //const uint32_t streamID = std::stoi(splitMessage[2]);
+        //const uint32_t messageID = std::stoi(splitMessage[3]);
+        //const std::string& data = splitMessage[4];
 
         auto mappedStream = activeStreams.find(streamID);
         if (mappedStream != activeStreams.end())    // failsafe
@@ -483,12 +532,14 @@ void Falcon::DecodeMessage(const std::string& from, std::vector<char> message)
             mappedStream->second->OnDataReceived(messageID, data);
         }
     }
-    if (messageType == "DISCONNECT")
+    if (messageType == (uint8_t) 0x05)  // DISCONNECT
     {
-        const uint64_t senderID = std::stoi(splitMessage[1]);
+        uint64_t senderID;
+        memcpy(&senderID, message.data() + 1, sizeof(uint64_t));
+
         OnClientDisconnected(senderID);
     }
-    if (messageType == "DISCONNECTACK")
+    if (messageType == (uint8_t) 0x06)  // DISCONNECTACK
     {
         OnDisconnect();
     }
