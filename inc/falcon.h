@@ -78,7 +78,7 @@ public:
     void FindStreamMessage(uint32_t streamID, uint32_t messageID, std::vector<char> &messageBuffer);    // used for tests
 
     // <clientID, clientInfo>
-    std::map<uint64_t, ClientInfo*> clients;
+    std::map<uint64_t, std::shared_ptr<ClientInfo>> clients;
 
     uint64_t ClientID;
 
@@ -94,7 +94,7 @@ private:
     //void HeartBeat();
     void CleanUpLoop();
 
-    long long ElapsedTime(ClientInfo* c);
+    long long ElapsedTime(std::shared_ptr<ClientInfo> c);
     uint64_t GetSenderID(std::string &from);
 
 
@@ -107,6 +107,7 @@ private:
     std::thread updateThread;
     std::thread listenThread;
     std::atomic<bool> running = false;
+    std::atomic<bool> runningCleanUp = false;
 
     // streams
     std::unordered_map<uint32_t, std::shared_ptr<Stream>> activeStreams;    // <streamID, Stream>
@@ -121,13 +122,3 @@ private:
     void AddMessageToSendBuffer(uint64_t receiverID, std::vector<char> message);
 
 };
-
-/*
-inline void Falcon::HeartbeatLoop()
-{
-    while (true) {
-        HeartBeat();
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-}
-*/

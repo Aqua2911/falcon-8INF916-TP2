@@ -16,6 +16,7 @@ void Falcon::ConnectTo(const std::string &ip, uint16_t port)
 {
     // clients vector doesn't have data yet so we can't add message to message buffer
     SendTo(ip, port, "CONNECT|");
+    std::cout << "Send Connect" << std::endl;
 
     StartListening(port);
 
@@ -29,9 +30,9 @@ void Falcon::OnConnectionEvent(uint64_t newClientID)    // client API
     // add server to "clients" map
     if (!clients.empty())
     {
-        clients.clear(); // empty clients map so it only has one server at a time
+        clients.clear();// empty clients map so it only has one server at a time
     }
-    auto* newServer = new ClientInfo;
+    std::shared_ptr<ClientInfo> newServer = std::make_shared<ClientInfo>();;
     newServer->ip = "127.0.0.1";
     newServer->port = 5555;
     newServer->lastHeartbeat = std::chrono::steady_clock::now();
@@ -68,7 +69,7 @@ void Falcon::OnClientConnected(const std::string &from, uint16_t clientPort)    
         newClientID = 1;
         StartCleanUp();
     }
-    auto* newClient = new ClientInfo;
+    std::shared_ptr<ClientInfo> newClient = std::make_shared<ClientInfo>();;
     //newClient->clientID = newClientID;
     newClient->ip = from;
     newClient->port = clientPort;
@@ -96,16 +97,16 @@ void Falcon::OnClientDisconnected(uint64_t clientID)    // not sure if this work
     if (it != clients.end()) {
         clientIP = it->second->ip;
         clientPort = it->second->port;
+
+        it->second = nullptr;;
         clients.erase(it);
 
         // client is no longer part of clients list so we need to manually send the DC ACK message
         SendTo(clientIP, clientPort,"DISCONNECTACK|");
     }
-    delete it->second;
     std::cout << "Client Disconnected" << std::endl;
-    if (clients.empty())
-        StopCleanUp();
-
+    //if (clients.empty())
+        //StopCleanUp();
 }
 
 void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
@@ -120,6 +121,7 @@ void Falcon::UpdateLastHeartbeat(const uint64_t clientID)
 void Falcon::StartCleanUp()
 {
     if (ClientID ==0) {
+        runningCleanUp.store(true);
         CleanConnectionsThread = std::thread(&Falcon::CleanUpLoop, this);
     }
 }
@@ -127,7 +129,7 @@ void Falcon::StartCleanUp()
 //Executed on Thread 2
 void Falcon::CleanUpLoop()
 {
-    while (running) {
+    while (runningCleanUp) {
         CleanConnections();
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
@@ -137,18 +139,34 @@ void Falcon::CleanUpLoop()
 //Executed on Thread 2
 void Falcon::CleanConnections()
 {
-    for (auto c: clients)
+    if (!clients.empty())
     {
-        if (ElapsedTime(c.second) > 5)
-            OnClientDisconnected(c.first);
+        for (auto it = clients.begin(); it != clients.end(); )
+        {
+            if (it->first < 100000)
+            {
+                if (ElapsedTime(it->second) > 5)
+                {
+                    OnClientDisconnected(it->first); // Call after erase
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
     }
 }
 
 //Executed on Thread 1
 void Falcon::StopCleanUp()
 {
-    running.store(false);
-    if (ClientID != 0)
+    runningCleanUp.store(false);
+    if (ClientID != 0 || !CleanConnectionsThread.joinable())
     {
         return;
     }
@@ -158,7 +176,9 @@ void Falcon::StopCleanUp()
     }
 }
 
-long long Falcon::ElapsedTime(ClientInfo* c) {
+long long Falcon::ElapsedTime(std::shared_ptr<ClientInfo> c) {
+    if (c == nullptr || !c)
+        return 0;
     std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
     auto duration = now - c->lastHeartbeat;
     auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
@@ -329,10 +349,12 @@ void Falcon::Update()
 
 void Falcon::UpdateLoop()
 {
+    std::cout << "Start Update" << std::endl;
     while (running)
     {
         Update();
     }
+    std::cout << "End Update" << std::endl;
 }
 
 void Falcon::StartListening(uint16_t port)
@@ -352,6 +374,7 @@ void Falcon::StopListening() {
     if (listenThread.joinable() && listenThread.get_id() != std::this_thread::get_id()) {
         listenThread.join();
     }
+    std::cout << "Listening Threads joined" << std::endl;
 }
 
 void Falcon::Listen(uint16_t port)
@@ -359,6 +382,8 @@ void Falcon::Listen(uint16_t port)
     std::string from_ip;
     from_ip.resize(255);
     std::array<char, 65535> buffer{};
+
+    std::cout << "Start Listening" << std::endl;
 
     while (running)
     {

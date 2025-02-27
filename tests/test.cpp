@@ -64,25 +64,32 @@ TEST_CASE("Can Connect To", "[falcon]") {
 
     client->ConnectTo("127.0.0.1", 5555);
 
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::this_thread::sleep_for(std::chrono::seconds(3));
     REQUIRE(!client->clients.empty());
     REQUIRE(!server->clients.empty());
     REQUIRE(client->ClientID == 1);
 }
 
 TEST_CASE("Can Notify Disconnection", "[falcon]") {
-    auto sender = Falcon::Connect("127.0.0.1", 5556);
-    auto receiver = Falcon::Listen("127.0.0.1", 5555);
-    sender->ConnectTo("127.0.0.1", 5555);
+    auto client = Falcon::Connect("127.0.0.1", 5556);
+    auto server = Falcon::Listen("127.0.0.1", 5555);
 
-    std::string from_ip;
-    from_ip.resize(255);
-    std::array<char, 65535> buffer{};
-    receiver->ReceiveFrom(from_ip, buffer);
+    REQUIRE(client != nullptr);
+    REQUIRE(server != nullptr);
 
-    REQUIRE(!receiver->clients.empty());
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    REQUIRE(receiver->clients.empty());
+    server->StartListening(5556);
+
+
+    client->ConnectTo("127.0.0.1", 5555);
+
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    REQUIRE(!client->clients.empty());
+    REQUIRE(!server->clients.empty());
+    REQUIRE(client->ClientID == 1);
+
+    std::this_thread::sleep_for(std::chrono::seconds(6));
+
+    REQUIRE(server->clients.empty());
 }
 
 TEST_CASE("Stream can send and receive Ack", "[stream]") {
