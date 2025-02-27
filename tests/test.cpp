@@ -121,47 +121,37 @@ TEST_CASE("Stream can send and receive Ack", "[stream]") {
 
 
 TEST_CASE("Stream can send and receive data", "[stream]") {
-    auto client = Falcon::Connect("127.0.0.1", 5556);   //client
-    auto server = Falcon::Listen("127.0.0.1", 5555);  //server
+    auto client = Falcon::Connect("127.0.0.1", 5556);
+    auto server = Falcon::Listen("127.0.0.1", 5555);
 
-    //Connect client to server
+    REQUIRE(client != nullptr);
+    REQUIRE(server != nullptr);
+
+    server->StartListening(5556);
+
+
     client->ConnectTo("127.0.0.1", 5555);
 
-    std::string from_ip;
-    from_ip.resize(255);
-    std::array<char, 65535> buffer{};
-
-    //Receive the client connection
-    server->ReceiveFrom(from_ip, buffer);
-    client->ReceiveFrom(from_ip, buffer);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
 
     // Server-side creation of reliable stream
     auto stream = server->CreateStream(client->ClientID, true);
     server->NotifyNewStream(*stream);
 
-    std::memset(buffer.data(), 0, buffer.size());
-
-    //Receive new Stream Info
-    client->ReceiveFrom(from_ip, buffer);
-
-    std::memset(buffer.data(), 0, buffer.size());
-    //Receive Ack
-    server->ReceiveFrom(from_ip, buffer);
-
-    std::memset(buffer.data(), 0, buffer.size());
     //Send Message Through stream
     stream->SendData("Hello World");
 
-    std::memset(buffer.data(), 0, buffer.size());
-    //Receive Stream Message
-    client->ReceiveFrom(from_ip, buffer);
 
-    std::memset(buffer.data(), 0, buffer.size());
-    //Receive MessageACK for reliability
-    server->ReceiveFrom(from_ip, buffer);
 
-    std::cout << "Stream Data Received" << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    auto serverStream = server->activeStreams.find(1);
+    auto clientStream = client->activeStreams.find(1);
+    REQUIRE(serverStream != nullptr);
+    REQUIRE(clientStream != nullptr);
+
+    REQUIRE(!serverStream->second->messageMap.empty());
+    REQUIRE(!clientStream->second->messageMap.empty());
 }
 
 TEST_CASE("Can Listen for messages on other thread", "[falcon]") {
