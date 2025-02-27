@@ -83,6 +83,8 @@ public:
 
     uint64_t ClientID;
 
+    std::unordered_map<uint32_t, std::shared_ptr<Stream>> activeStreams;    // <streamID, Stream>
+
 private:
     int SendToInternal(const std::string& to, uint16_t port, std::span<const char> message);
     int ReceiveFromInternal(std::string& from, std::span<char, 65535> message);
@@ -111,7 +113,7 @@ private:
     std::atomic<bool> runningCleanUp = false;
 
     // streams
-    std::unordered_map<uint32_t, std::shared_ptr<Stream>> activeStreams;    // <streamID, Stream>
+    //std::unordered_map<uint32_t, std::shared_ptr<Stream>> activeStreams;    // <streamID, Stream>
     uint32_t nextStreamID = 1;
 
     std::vector<std::pair<uint64_t, std::vector<char>>> messagesToBeSent;    // <receiverID, message> pairs

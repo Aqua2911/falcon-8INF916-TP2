@@ -323,9 +323,12 @@ void Falcon::Update()
 
     for (const auto &[streamID, stream] : activeStreams)
     {
-        if (stream->HasDataToBeSent())
+        if (stream != nullptr)
         {
-            stream->WriteDataToBuffer(messagesToBeSent);
+            if (stream->HasDataToBeSent())
+            {
+                stream->WriteDataToBuffer(messagesToBeSent);
+            }
         }
     }
 
