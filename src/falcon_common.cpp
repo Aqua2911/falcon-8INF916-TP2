@@ -15,7 +15,13 @@ int Falcon::ReceiveFrom(std::string& from, const std::span<char, 65535> message)
 void Falcon::ConnectTo(const std::string &ip, uint16_t port)
 {
     // clients vector doesn't have data yet so we can't add message to message buffer
-    SendTo(ip, port, "CONNECT|");
+    char buffer[1] = {};
+    uint8_t type = 0x01;
+    memcpy(buffer, &type, sizeof(uint8_t));
+    std::span<char, 1> message(buffer);
+
+    SendTo(ip, port, message);
+    //SendTo(ip, port, "CONNECT|");
     std::cout << "Send Connect" << std::endl;
 
     StartListening(port);

@@ -1,0 +1,8 @@
+﻿message-types:
+  - CONNECT: 0x00
+    CONNECTACK: 0x01
+    NEWSTREAM: 0x02
+    STREAMACK: 0x03
+    STREAMDATA: 0x04
+    DISCONNECT: 0x05
+    DISCONNECTACK: 0x06
